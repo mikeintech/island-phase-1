@@ -117,6 +117,66 @@ body {
   color: #101211;
 }
 
+.online-panel {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  width: min(260px, calc(100vw - 28px));
+  margin: 8px auto 0;
+  padding: 6px;
+  border: 1px solid rgba(150, 225, 200, 0.16);
+  border-radius: 8px;
+  background: rgba(9, 10, 9, 0.42);
+  backdrop-filter: blur(14px);
+}
+
+.online-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.online-actions button,
+.online-panel input {
+  min-height: 30px;
+  border: 1px solid rgba(244, 241, 232, 0.12);
+  border-radius: 6px;
+  background: rgba(244, 241, 232, 0.06);
+  color: #f4f1e8;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.online-actions button {
+  min-width: 46px;
+  padding: 0 8px;
+}
+
+.online-actions button.active {
+  background: #96e1c8;
+  color: #101211;
+}
+
+.online-panel input {
+  min-width: 0;
+  width: 100%;
+  padding: 0 8px;
+  text-transform: none;
+}
+
+.online-status {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: rgba(244, 241, 232, 0.66);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .lab-toggle {
   position: absolute;
   top: max(92px, calc(env(safe-area-inset-top) + 92px));

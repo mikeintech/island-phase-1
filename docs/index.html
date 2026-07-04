@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#101211" />
     <title>Island Phase 1</title>
-    <script type="module" crossorigin src="./assets/index-nsWAfeMC.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DKU3NxpE.css">
+    <script type="module" crossorigin src="./assets/index-Dfl6MUcm.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DfRQPaaj.css">
   </head>
   <body>
     <main id="app">
@@ -19,7 +19,15 @@
         </div>
         <div class="mode-toggle" role="group" aria-label="Mode">
           <button id="freeMode" class="active" type="button">Free Play</button>
-          <button id="scoreMode" type="button">First To 7</button>
+          <button id="scoreMode" type="button">AI To 7</button>
+        </div>
+        <div class="online-panel" aria-label="Multiplayer">
+          <div class="online-actions">
+            <button id="hostButton" type="button">Host</button>
+            <button id="joinButton" type="button">Join</button>
+          </div>
+          <input id="peerCode" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Peer ID" />
+          <div id="onlineStatus" class="online-status">Solo · AI defense</div>
         </div>
       </section>
       <button id="labToggle" class="lab-toggle" type="button">Lab</button>
@@ -32,5 +40,6 @@
         <dl id="breakdown" class="breakdown"></dl>
       </section>
     </main>
+    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   </body>
 </html>

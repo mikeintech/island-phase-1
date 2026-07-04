@@ -9,6 +9,10 @@ const resultText = document.querySelector('#resultText');
 const breakdownEl = document.querySelector('#breakdown');
 const freeModeButton = document.querySelector('#freeMode');
 const scoreModeButton = document.querySelector('#scoreMode');
+const hostButton = document.querySelector('#hostButton');
+const joinButton = document.querySelector('#joinButton');
+const peerCodeInput = document.querySelector('#peerCode');
+const onlineStatusEl = document.querySelector('#onlineStatus');
 const labToggle = document.querySelector('#labToggle');
 const labPanel = document.querySelector('#labPanel');
 const labReadout = document.querySelector('#labReadout');
@@ -575,6 +579,23 @@ const input = {
   totalDistance: 0
 };
 
+const online = {
+  role: 'solo',
+  peer: null,
+  conn: null,
+  hostId: '',
+  status: 'Solo · AI defense',
+  remoteInput: {
+    active: false,
+    pressure: 0,
+    worldDir: new THREE.Vector3(),
+    lastAt: 0
+  },
+  remoteSnapshot: null,
+  snapshotTimer: 0,
+  sendTimer: 0
+};
+
 const audio = createAudioEngine();
 const clock = new THREE.Clock();
 
@@ -587,6 +608,8 @@ renderer.domElement.addEventListener('pointerup', onPointerUp);
 renderer.domElement.addEventListener('pointercancel', onPointerUp);
 freeModeButton.addEventListener('click', () => setMode('free'));
 scoreModeButton.addEventListener('click', () => setMode('score'));
+hostButton.addEventListener('click', startOnlineHost);
+joinButton.addEventListener('click', startOnlineJoin);
 labToggle.addEventListener('click', toggleLab);
 window.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() === 'l') toggleLab();
@@ -617,6 +640,18 @@ function update(dt) {
     if (game.resultHold === 0) resultPanel.classList.add('hidden');
   }
 
+  if (online.role === 'guest') {
+    applyRemoteSnapshot(dt);
+    sendGuestDefenseInput(dt);
+    updateNet(dt);
+    offense.update(dt);
+    defense.update(dt);
+    updateCamera(dt);
+    updateLab();
+    updateUI();
+    return;
+  }
+
   updateOffense(dt);
   updateDefender(dt);
   updateAdvantage(dt);
@@ -630,6 +665,7 @@ function update(dt) {
   updateCamera(dt);
   updateLab();
   updateUI();
+  sendHostSnapshot(dt);
 }
 
 function updateOffense(dt) {
@@ -737,6 +773,11 @@ function finishMove(kind) {
 }
 
 function updateDefender(dt) {
+  if (online.role === 'host' && online.conn?.open) {
+    updatePlayerDefense(dt);
+    return;
+  }
+
   game.defenderSamples.push({
     age: 0,
     pos: offense.root.clone(),
@@ -765,16 +806,23 @@ function updateDefender(dt) {
   game.defenderWrongWay = Math.max(0, game.defenderWrongWay - dt);
   game.defenderBite = Math.max(0, game.defenderBite - dt);
   game.defenderContest = Math.max(0, game.defenderContest - dt);
+  const liveSep = flatDistance(offense.root, defense.root);
+  if ((game.state === 'gather' || game.state === 'shot') && liveSep < 1.72) {
+    game.defenderContest = Math.max(game.defenderContest, game.state === 'shot' ? 0.72 : 0.52);
+  }
 
   const samplePos = delayed?.pos || offense.root;
   const sampleVel = delayed?.vel || offense.velocity;
   const toRim = tmpA.copy(rimFloor).sub(samplePos).normalize();
-  const ideal = tmpB.copy(samplePos).addScaledVector(toRim, 0.94);
-  ideal.x += game.defenderShade * 0.18;
+  const aiPressure = game.mode === 'score' ? 1 : 0.82;
+  const guardGap = game.state === 'attack' ? 0.78 : game.state === 'retreat' ? 1.08 : 0.92;
+  const ideal = tmpB.copy(samplePos).addScaledVector(toRim, guardGap);
+  ideal.x += game.defenderShade * THREE.MathUtils.lerp(0.14, 0.24, aiPressure);
+  ideal.addScaledVector(sampleVel, game.state === 'attack' ? 0.13 : 0.07);
 
-  let maxSpeed = 3.75;
+  let maxSpeed = THREE.MathUtils.lerp(3.45, 4.15, aiPressure);
   game.defenderState = 'Neutral';
-  if (flatDistance(offense.root, defense.root) < 0.72) {
+  if (liveSep < 0.72) {
     game.defenderCrowd = clamp01(game.defenderCrowd + dt * 1.4);
     game.defenderState = 'Crowd';
   } else {
@@ -797,7 +845,7 @@ function updateDefender(dt) {
 
   if (game.defenderContest > 0) {
     ideal.copy(offense.root).addScaledVector(toRim, 0.55);
-    maxSpeed = 4.4;
+    maxSpeed = 4.7;
     game.defenderState = 'Contest';
     defense.contest = Math.max(defense.contest, game.defenderContest);
   } else if (Math.abs(game.defenderShade) > 0.42) {
@@ -822,6 +870,75 @@ function updateDefender(dt) {
     game.defenderContest > 0 ? 'shot' : game.defenderWrongWay > 0 ? 'beat' : game.defenderBite > 0 ? 'bite' : 'defense';
   defense.ballHand = offense.ballHand;
   defense.beat = Math.max(defense.beat, game.defenderWrongWay);
+}
+
+function updatePlayerDefense(dt) {
+  const control = online.remoteInput;
+  const desired = tmpA.set(0, 0, 0);
+  if (control.active && control.pressure > 0.08) {
+    desired.copy(control.worldDir).multiplyScalar(0.72 + control.pressure * 3.55);
+    game.defenderState = control.pressure > 0.68 ? 'Cutoff' : 'Slide';
+  } else {
+    game.defenderState = 'Disciplined';
+  }
+
+  game.defenderWrongWay = Math.max(0, game.defenderWrongWay - dt * 1.4);
+  game.defenderBite = Math.max(0, game.defenderBite - dt * 1.8);
+  game.defenderContest = Math.max(0, game.defenderContest - dt * 1.6);
+
+  const toGuard = tmpB.copy(offense.root).sub(defense.root);
+  const gap = toGuard.length();
+  if (!control.active && gap > 1.55) {
+    toGuard.normalize().multiplyScalar(Math.min(1.8, gap));
+    desired.addScaledVector(toGuard, 0.55);
+  }
+
+  defense.velocity.lerp(desired, 1 - Math.exp(-dt * 8.5));
+  defense.root.addScaledVector(defense.velocity, dt);
+  clampPlayer(defense.root);
+
+  const sep = flatDistance(offense.root, defense.root);
+  game.defenderCrowd = sep < 0.78 ? clamp01(game.defenderCrowd + dt * 1.8) : clamp01(game.defenderCrowd - dt * 1.4);
+  if (game.defenderContest > 0) game.defenderState = 'Contest';
+  else if (game.defenderBite > 0) game.defenderState = 'Bite';
+  else if (game.defenderWrongWay > 0) game.defenderState = 'Beat';
+
+  defense.shade = clamp((defense.root.x - offense.root.x) * 0.65, -1, 1);
+  defense.action =
+    game.defenderContest > 0 ? 'shot' : game.defenderWrongWay > 0 ? 'beat' : game.defenderBite > 0 ? 'bite' : 'defense';
+  defense.ballHand = offense.ballHand;
+  defense.beat = Math.max(defense.beat, game.defenderWrongWay);
+  defense.contest = Math.max(defense.contest, game.defenderContest);
+}
+
+function handleDefenseRelease() {
+  const sep = flatDistance(offense.root, defense.root);
+  if ((game.state === 'gather' || game.state === 'shot') && sep < 1.95) {
+    game.defenderContest = Math.max(game.defenderContest, 0.86);
+    defense.contest = Math.max(defense.contest, 0.86);
+    game.defenderState = 'Contest';
+  } else {
+    game.defenderBite = Math.max(game.defenderBite, 0.42);
+    if (sep > 1.15) game.defenderWrongWay = Math.max(game.defenderWrongWay, 0.14);
+  }
+}
+
+function handleDefenseFlick(dir) {
+  const toBall = tmpA.copy(offense.root).sub(defense.root);
+  toBall.y = 0;
+  if (toBall.lengthSq() > 0.001) toBall.normalize();
+  const towardBall = dir.dot(toBall);
+  if (towardBall > 0.62) {
+    const sep = flatDistance(offense.root, defense.root);
+    if (!game.gather && !game.shot && sep < 0.82 && game.fatigue > 0.18) {
+      resolveDeadPossession('Poked', 'turnover', true);
+    } else {
+      game.defenderBite = Math.max(game.defenderBite, 0.24);
+      game.defenderCrowd = clamp01(game.defenderCrowd + 0.16);
+    }
+    return;
+  }
+  game.defenderShade = clamp(dir.x, -1, 1);
 }
 
 function updateAdvantage(dt) {
@@ -1029,6 +1146,24 @@ function updateCamera(dt) {
 function onPointerDown(event) {
   if (event.clientY < window.innerHeight * 0.34 || input.active) return;
   audio.unlock();
+  if (online.role === 'guest') {
+    renderer.domElement.setPointerCapture(event.pointerId);
+    input.active = true;
+    input.pointerId = event.pointerId;
+    input.startX = event.clientX;
+    input.startY = event.clientY;
+    input.x = event.clientX;
+    input.y = event.clientY;
+    input.lastX = event.clientX;
+    input.lastY = event.clientY;
+    input.startTime = performance.now();
+    input.lastTime = input.startTime;
+    input.pressure = 0;
+    input.velocity.set(0, 0);
+    input.totalDistance = 0;
+    sendGuestDefenseInput(0, true);
+    return;
+  }
   if (game.state === 'gather' && game.gather) {
     startShotFake();
     return;
@@ -1073,6 +1208,19 @@ function onPointerMove(event) {
   }
 
   const flickSpeed = input.velocity.length();
+  if (online.role === 'guest') {
+    if (flickSpeed > 900 && now - input.recentFlickAt > 170) {
+      input.recentFlickAt = now;
+      sendNetwork({
+        type: 'defenseFlick',
+        x: input.worldDir.x,
+        z: input.worldDir.z
+      });
+    }
+    sendGuestDefenseInput(0);
+    return;
+  }
+
   if (flickSpeed > 900 && now - input.recentFlickAt > 170 && game.state !== 'shot') {
     input.recentFlickAt = now;
     interpretFlick(input.velocity.x, input.velocity.y, flickSpeed);
@@ -1086,6 +1234,12 @@ function onPointerUp(event) {
   input.active = false;
   input.pointerId = null;
   input.pressure = 0;
+
+  if (online.role === 'guest') {
+    sendNetwork({ type: 'defenseRelease' });
+    sendGuestDefenseInput(0, true);
+    return;
+  }
 
   if (['gather', 'shot', 'finish', 'check'].includes(game.state)) return;
   if (game.state === 'contact' && heldMs < 420) {
@@ -1294,7 +1448,7 @@ function resolveDeadPossession(label, result, defenderPoint) {
   game.resetTimer = 0.8;
 }
 
-function showFeedback(shot) {
+function showFeedback(shot, broadcast = true) {
   const label = shot.deadLabel || outcomeLabel(shot.outcome);
   resultText.textContent = label;
   const metrics = shot.metrics;
@@ -1310,6 +1464,17 @@ function showFeedback(shot) {
     .join('');
   resultPanel.classList.remove('hidden');
   game.resultHold = shot.outcome === 'cookedSwish' ? 2.3 : 1.75;
+  if (broadcast && online.role === 'host') {
+    sendNetwork({
+      type: 'feedback',
+      shot: {
+        outcome: shot.outcome,
+        deadLabel: shot.deadLabel,
+        deadResult: shot.deadResult,
+        metrics: shot.metrics
+      }
+    });
+  }
 }
 
 function outcomeLabel(outcome) {
@@ -1337,12 +1502,16 @@ function contestGrade(value) {
 }
 
 function setMode(mode) {
+  if (online.role === 'guest') return;
   game.mode = mode;
   freeModeButton.classList.toggle('active', mode === 'free');
   scoreModeButton.classList.toggle('active', mode === 'score');
   game.userScore = 0;
   game.aiScore = 0;
   resetPossession(true);
+  if (online.role === 'solo') {
+    setOnlineStatus(mode === 'score' ? 'AI To 7 · solo defense' : 'Solo · AI defense');
+  }
 }
 
 function resetPossession(initial) {
@@ -1397,6 +1566,9 @@ function setState(state) {
 function updateUI() {
   scoreEl.textContent = game.mode === 'score' ? `${game.userScore} - ${game.aiScore}` : '0 - 0';
   clockEl.textContent = game.mode === 'score' ? game.shotClock.toFixed(1) : 'FREE';
+  freeModeButton.classList.toggle('active', game.mode === 'free');
+  scoreModeButton.classList.toggle('active', game.mode === 'score');
+  updateOnlineUI();
 }
 
 function toggleLab() {
@@ -1404,6 +1576,220 @@ function toggleLab() {
   labToggle.classList.toggle('active', game.lab);
   labPanel.classList.toggle('hidden', !game.lab);
   if (!game.lab) labGuides.trail.length = 0;
+}
+
+function startOnlineHost() {
+  if (!window.Peer) {
+    setOnlineStatus('PeerJS unavailable');
+    return;
+  }
+  closeOnline();
+  online.role = 'host';
+  setMode('score');
+  setOnlineStatus('Creating host...');
+  online.peer = new window.Peer();
+  online.peer.on('open', (id) => {
+    online.hostId = id;
+    peerCodeInput.value = id;
+    setOnlineStatus(`Host ID ${id} · waiting`);
+  });
+  online.peer.on('connection', (conn) => setupConnection(conn, 'host'));
+  online.peer.on('error', (error) => setOnlineStatus(`Host error: ${error.type || 'peer'}`));
+}
+
+function startOnlineJoin() {
+  if (!window.Peer) {
+    setOnlineStatus('PeerJS unavailable');
+    return;
+  }
+  const hostId = peerCodeInput.value.trim();
+  if (!hostId) {
+    setOnlineStatus('Enter host ID');
+    return;
+  }
+  closeOnline();
+  online.role = 'guest';
+  setOnlineStatus('Joining...');
+  online.peer = new window.Peer();
+  online.peer.on('open', () => {
+    const conn = online.peer.connect(hostId, { reliable: true });
+    setupConnection(conn, 'guest');
+  });
+  online.peer.on('error', (error) => setOnlineStatus(`Join error: ${error.type || 'peer'}`));
+}
+
+function setupConnection(conn, role) {
+  if (online.conn && online.conn !== conn) online.conn.close();
+  online.conn = conn;
+  online.role = role;
+  conn.on('open', () => {
+    setOnlineStatus(role === 'host' ? 'Connected · you attack' : 'Connected · you defend');
+    if (role === 'host') {
+      setMode('score');
+      sendHostSnapshot(1, true);
+    }
+  });
+  conn.on('data', handleNetworkData);
+  conn.on('close', () => {
+    if (online.conn !== conn) return;
+    if (online.role !== 'solo') setOnlineStatus('Peer left · solo AI');
+    online.role = 'solo';
+    online.conn = null;
+  });
+  conn.on('error', () => {
+    if (online.conn === conn) setOnlineStatus('Connection error');
+  });
+}
+
+function closeOnline() {
+  if (online.conn) online.conn.close();
+  if (online.peer) online.peer.destroy();
+  online.conn = null;
+  online.peer = null;
+  online.hostId = '';
+  online.remoteSnapshot = null;
+  online.remoteInput.active = false;
+  online.snapshotTimer = 0;
+  online.sendTimer = 0;
+}
+
+function handleNetworkData(data) {
+  if (!data || typeof data !== 'object') return;
+  if (online.role === 'host') {
+    if (data.type === 'defenseInput') {
+      online.remoteInput.active = !!data.active;
+      online.remoteInput.pressure = clamp01(Number(data.pressure) || 0);
+      online.remoteInput.worldDir.set(Number(data.x) || 0, 0, Number(data.z) || 0);
+      if (online.remoteInput.worldDir.lengthSq() > 1) online.remoteInput.worldDir.normalize();
+      online.remoteInput.lastAt = performance.now();
+    } else if (data.type === 'defenseRelease') {
+      online.remoteInput.active = false;
+      handleDefenseRelease();
+    } else if (data.type === 'defenseFlick') {
+      const dir = new THREE.Vector3(Number(data.x) || 0, 0, Number(data.z) || 0);
+      if (dir.lengthSq() > 0.001) handleDefenseFlick(dir.normalize());
+    }
+    return;
+  }
+
+  if (online.role === 'guest') {
+    if (data.type === 'snapshot') {
+      online.remoteSnapshot = data.snapshot;
+    } else if (data.type === 'feedback') {
+      showFeedback(data.shot, false);
+    }
+  }
+}
+
+function sendNetwork(data) {
+  if (online.conn?.open) online.conn.send(data);
+}
+
+function sendGuestDefenseInput(dt, force = false) {
+  if (online.role !== 'guest' || !online.conn?.open) return;
+  online.sendTimer += dt;
+  if (!force && online.sendTimer < 0.045) return;
+  online.sendTimer = 0;
+  sendNetwork({
+    type: 'defenseInput',
+    active: input.active,
+    pressure: input.pressure,
+    x: input.worldDir.x,
+    z: input.worldDir.z
+  });
+}
+
+function sendHostSnapshot(dt, force = false) {
+  if (online.role !== 'host' || !online.conn?.open) return;
+  online.snapshotTimer += dt;
+  if (!force && online.snapshotTimer < 0.05) return;
+  online.snapshotTimer = 0;
+  sendNetwork({ type: 'snapshot', snapshot: serializeSnapshot() });
+}
+
+function serializeSnapshot() {
+  return {
+    mode: game.mode,
+    state: game.state,
+    shotClock: Number(game.shotClock.toFixed(2)),
+    userScore: game.userScore,
+    aiScore: game.aiScore,
+    defenderState: game.defenderState,
+    defenderShade: Number(game.defenderShade.toFixed(3)),
+    defenderWrongWay: Number(game.defenderWrongWay.toFixed(3)),
+    defenderBite: Number(game.defenderBite.toFixed(3)),
+    defenderContest: Number(game.defenderContest.toFixed(3)),
+    netPinch: Number(game.netPinch.toFixed(3)),
+    offense: serializePlayer(offense),
+    defense: serializePlayer(defense),
+    ball: serializeVec(ball.position)
+  };
+}
+
+function serializePlayer(player) {
+  return {
+    root: serializeVec(player.root),
+    velocity: serializeVec(player.velocity),
+    ballHand: player.ballHand,
+    action: player.action,
+    facing: Number(player.facing.toFixed(3)),
+    shade: Number(player.shade.toFixed(3)),
+    contest: Number(player.contest.toFixed(3)),
+    bite: Number(player.bite.toFixed(3)),
+    beat: Number(player.beat.toFixed(3))
+  };
+}
+
+function serializeVec(vec) {
+  return [Number(vec.x.toFixed(3)), Number(vec.y.toFixed(3)), Number(vec.z.toFixed(3))];
+}
+
+function applyRemoteSnapshot(dt) {
+  const snap = online.remoteSnapshot;
+  if (!snap) return;
+  game.mode = snap.mode || 'score';
+  game.state = snap.state || game.state;
+  game.shotClock = Number(snap.shotClock) || game.shotClock;
+  game.userScore = Number(snap.userScore) || 0;
+  game.aiScore = Number(snap.aiScore) || 0;
+  game.defenderState = snap.defenderState || game.defenderState;
+  game.defenderShade = Number(snap.defenderShade) || 0;
+  game.defenderWrongWay = Number(snap.defenderWrongWay) || 0;
+  game.defenderBite = Number(snap.defenderBite) || 0;
+  game.defenderContest = Number(snap.defenderContest) || 0;
+  game.netPinch = Math.max(game.netPinch, Number(snap.netPinch) || 0);
+  applyRemotePlayer(offense, snap.offense, dt);
+  applyRemotePlayer(defense, snap.defense, dt);
+  if (snap.ball) {
+    ball.position.set(snap.ball[0], snap.ball[1], snap.ball[2]);
+    shadows.ball.position.set(ball.position.x, 0.012, ball.position.z);
+    shadows.ball.scale.setScalar(clamp(0.3 - ball.position.y * 0.04, 0.12, 0.3));
+  }
+}
+
+function applyRemotePlayer(player, data, dt) {
+  if (!data) return;
+  const blend = 1 - Math.exp(-dt * 18);
+  player.root.lerp(tmpA.set(data.root[0], data.root[1], data.root[2]), blend);
+  player.velocity.set(data.velocity[0], data.velocity[1], data.velocity[2]);
+  player.ballHand = data.ballHand || player.ballHand;
+  player.action = data.action || player.action;
+  player.facing = data.facing ?? player.facing;
+  player.shade = data.shade ?? player.shade;
+  player.contest = Math.max(player.contest, data.contest || 0);
+  player.bite = Math.max(player.bite, data.bite || 0);
+  player.beat = Math.max(player.beat, data.beat || 0);
+}
+
+function setOnlineStatus(status) {
+  online.status = status;
+  updateOnlineUI();
+}
+
+function updateOnlineUI() {
+  onlineStatusEl.textContent = online.status;
+  hostButton.classList.toggle('active', online.role === 'host');
+  joinButton.classList.toggle('active', online.role === 'guest');
 }
 
 function updateLab() {
