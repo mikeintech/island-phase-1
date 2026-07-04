@@ -175,6 +175,7 @@ class StickPlayer {
     this.shoeMaterial = shoeMaterial;
     this.model = null;
     this.bones = {};
+    this.boneRestRotations = {};
     this.parts = {
       hips: sphere(0.045, shortsMaterial),
       chest: sphere(0.045, jerseyMaterial),
@@ -225,7 +226,10 @@ class StickPlayer {
               metalness: 0.02
             });
           }
-          if (object.isBone) this.bones[object.name] = object;
+          if (object.isBone) {
+            this.bones[object.name] = object;
+            this.boneRestRotations[object.name] = object.rotation.clone();
+          }
         });
         model.scale.setScalar(1.08);
         model.position.z = -0.03;
@@ -442,8 +446,9 @@ class StickPlayer {
     this.model.position.y = Math.max(0, pose.feet.left.y - 0.035);
     this.model.rotation.y = -this.facing + Math.PI / 2;
 
-    Object.values(this.bones).forEach((bone) => {
-      bone.rotation.set(0, 0, 0);
+    Object.entries(this.bones).forEach(([name, bone]) => {
+      const rest = this.boneRestRotations[name];
+      if (rest) bone.rotation.copy(rest);
     });
 
     rotateBone(this.bones.Root_00, -0.18 * defenseLoad - 0.24 * crossLoad - 0.2 * gatherLoad, 0, side * 0.08 * crossLoad);
