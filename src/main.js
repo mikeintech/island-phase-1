@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import './styles.css';
 
 const container = document.querySelector('#game');
@@ -103,12 +101,12 @@ const materials = {
     side: THREE.DoubleSide
   }),
   offSkin: new THREE.MeshStandardMaterial({ color: 0xf1dfc7, roughness: 0.5 }),
-  offJersey: new THREE.MeshStandardMaterial({ color: 0x245ef2, roughness: 0.4 }),
-  offShorts: new THREE.MeshStandardMaterial({ color: 0x245ef2, roughness: 0.43 }),
+  offJersey: new THREE.MeshStandardMaterial({ color: 0xf1dfc7, roughness: 0.48 }),
+  offShorts: new THREE.MeshStandardMaterial({ color: 0xf1dfc7, roughness: 0.5 }),
   offShoe: new THREE.MeshStandardMaterial({ color: 0x131821, roughness: 0.36 }),
   defLimb: new THREE.MeshStandardMaterial({ color: 0x111719, roughness: 0.5 }),
-  defJersey: new THREE.MeshStandardMaterial({ color: 0xe8492d, roughness: 0.42 }),
-  defShorts: new THREE.MeshStandardMaterial({ color: 0x101316, roughness: 0.52 }),
+  defJersey: new THREE.MeshStandardMaterial({ color: 0x111719, roughness: 0.54 }),
+  defShorts: new THREE.MeshStandardMaterial({ color: 0x111719, roughness: 0.56 }),
   defShoe: new THREE.MeshStandardMaterial({ color: 0x8de7cb, roughness: 0.38 }),
   ball: new THREE.MeshStandardMaterial({ color: 0xe8752d, roughness: 0.54 }),
   ballSeam: new THREE.MeshBasicMaterial({ color: 0x2a1408 }),
@@ -137,8 +135,6 @@ const ball = new THREE.Mesh(new THREE.SphereGeometry(0.13, 28, 18), materials.ba
 ball.castShadow = true;
 addBallSeams(ball);
 scene.add(ball);
-
-const stickModelPromise = new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/stick-man-rigged.glb`);
 
 class StickPlayer {
   constructor({
@@ -173,26 +169,23 @@ class StickPlayer {
     this.jerseyMaterial = jerseyMaterial;
     this.shortsMaterial = shortsMaterial;
     this.shoeMaterial = shoeMaterial;
-    this.model = null;
-    this.bones = {};
-    this.boneRestRotations = {};
     this.parts = {
       hips: sphere(0.045, shortsMaterial),
       chest: sphere(0.045, jerseyMaterial),
-      head: sphere(0.115, headMaterial),
-      leftHand: sphere(0.052, limbMaterial),
-      rightHand: sphere(0.052, limbMaterial),
+      head: sphere(0.145, headMaterial),
+      leftHand: sphere(0.062, limbMaterial),
+      rightHand: sphere(0.062, limbMaterial),
       leftFoot: foot(shoeMaterial),
       rightFoot: foot(shoeMaterial),
-      jersey: new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 1, 18), jerseyMaterial),
-      shorts: new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 1, 16), shortsMaterial),
+      jersey: new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.68, 10, 20), jerseyMaterial),
+      shorts: new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.18, 8, 16), shortsMaterial),
       pivot: ring(accentMaterial),
       ballHand: sphere(0.045, accentMaterial),
       limbs: []
     };
 
     for (let i = 0; i < 10; i += 1) {
-      const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1, 8), limbMaterial);
+      const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.88, 6, 12), limbMaterial);
       limb.castShadow = true;
       this.parts.limbs.push(limb);
       this.group.add(limb);
@@ -208,57 +201,6 @@ class StickPlayer {
     this.parts.chest.visible = false;
     this.group.add(this.parts.pivot);
     scene.add(this.group);
-    this.attachRiggedModel();
-  }
-
-  attachRiggedModel() {
-    stickModelPromise
-      .then((gltf) => {
-        const model = cloneSkeleton(gltf.scene);
-        const tint = this.role === 'offense' ? 0xf1dfc7 : 0x111719;
-        model.traverse((object) => {
-          if (object.isMesh || object.isSkinnedMesh) {
-            object.castShadow = true;
-            object.frustumCulled = false;
-            object.material = new THREE.MeshStandardMaterial({
-              color: tint,
-              roughness: this.role === 'offense' ? 0.48 : 0.56,
-              metalness: 0.02
-            });
-          }
-          if (object.isBone) {
-            this.bones[object.name] = object;
-            this.boneRestRotations[object.name] = object.rotation.clone();
-          }
-        });
-        model.scale.setScalar(1.08);
-        model.position.z = -0.03;
-        this.model = model;
-        this.group.add(model);
-        this.setProceduralBodyVisible(false);
-      })
-      .catch((error) => {
-        console.warn('Could not load stick man model', error);
-      });
-  }
-
-  setProceduralBodyVisible(visible) {
-    [
-      'hips',
-      'chest',
-      'head',
-      'leftHand',
-      'rightHand',
-      'leftFoot',
-      'rightFoot',
-      'jersey',
-      'shorts'
-    ].forEach((key) => {
-      this.parts[key].visible = visible;
-    });
-    this.parts.limbs.forEach((limb) => {
-      limb.visible = visible;
-    });
   }
 
   setPosition(x, z) {
@@ -393,7 +335,7 @@ class StickPlayer {
     this.parts.hips.position.copy(pose.hips);
     this.parts.chest.position.copy(pose.chest);
     this.parts.head.position.copy(pose.head);
-    this.parts.head.scale.set(0.82, 1.12, 0.78);
+    this.parts.head.scale.set(0.9, 1.02, 0.86);
     this.parts.leftHand.position.copy(pose.hands.left);
     this.parts.rightHand.position.copy(pose.hands.right);
     this.parts.leftFoot.position.copy(pose.feet.left);
@@ -403,11 +345,11 @@ class StickPlayer {
       this.parts.jersey,
       tmpA.copy(pose.hips).add(new THREE.Vector3(0, 0.04, 0)),
       tmpC.copy(pose.chest).add(new THREE.Vector3(0, -0.09, 0)),
-      0.46,
-      0.2
+      1.0,
+      0.82
     );
     this.parts.shorts.position.copy(pose.hips).add(new THREE.Vector3(0, -0.14, 0.02));
-    this.parts.shorts.scale.set(0.48, 0.23, 0.24);
+    this.parts.shorts.scale.set(0.9, 0.38, 0.72);
     this.parts.shorts.quaternion.identity();
     this.parts.pivot.visible = game.state === 'stop' || game.state === 'contact' || game.state === 'shotFake';
     this.parts.pivot.position.copy(this.pivotSide > 0 ? pose.feet.right : pose.feet.left);
@@ -424,20 +366,6 @@ class StickPlayer {
     placeLimb(limbs[7], pose.knees.right, pose.feet.right, 0.03);
     limbs[8].visible = false;
     limbs[9].visible = false;
-    if (this.model) {
-      this.setProceduralBodyVisible(false);
-      this.updateRiggedModel(pose);
-    }
-  }
-
-  updateRiggedModel(pose) {
-    this.model.position.y = Math.max(0, pose.feet.left.y - 0.035);
-    this.model.rotation.y = -this.facing + Math.PI / 2;
-
-    Object.entries(this.bones).forEach(([name, bone]) => {
-      const rest = this.boneRestRotations[name];
-      if (rest) bone.rotation.copy(rest);
-    });
   }
 }
 
