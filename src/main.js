@@ -24,8 +24,8 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111411);
-scene.fog = new THREE.Fog(0x111411, 12, 26);
+scene.background = new THREE.Color(0x07090b);
+scene.fog = new THREE.Fog(0x07090b, 10, 24);
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 50);
 const cameraRig = {
@@ -36,10 +36,10 @@ const cameraRig = {
   fov: 45
 };
 
-const hemi = new THREE.HemisphereLight(0xfff2d2, 0x22241f, 2.05);
+const hemi = new THREE.HemisphereLight(0xfff2d2, 0x111827, 1.75);
 scene.add(hemi);
 
-const keyLight = new THREE.DirectionalLight(0xffe4a8, 2.85);
+const keyLight = new THREE.DirectionalLight(0xffe4a8, 2.55);
 keyLight.position.set(-3.2, 7.2, 4.8);
 scene.add(keyLight);
 
@@ -47,31 +47,73 @@ const rimLight = new THREE.PointLight(0x79ffd2, 2.2, 7.5);
 rimLight.position.set(2.2, 3.4, -4.7);
 scene.add(rimLight);
 
+const violetLight = new THREE.PointLight(0xb35cff, 1.45, 8.5);
+violetLight.position.set(-3.2, 2.7, -1.8);
+scene.add(violetLight);
+
+const blueEdgeLight = new THREE.PointLight(0x4db6ff, 1.1, 8);
+blueEdgeLight.position.set(3.1, 1.6, 1.8);
+scene.add(blueEdgeLight);
+
+const courtTexture = createCourtTexture();
+
 const materials = {
   court: new THREE.MeshStandardMaterial({
-    color: 0x4a4942,
-    roughness: 0.76,
-    metalness: 0.03
+    color: 0xffffff,
+    map: courtTexture,
+    roughness: 0.58,
+    metalness: 0.08
   }),
   paint: new THREE.LineBasicMaterial({ color: 0xf4f1e8, transparent: true, opacity: 0.62 }),
   sideline: new THREE.LineBasicMaterial({ color: 0xf7be4e, transparent: true, opacity: 0.78 }),
-  offense: new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.42 }),
-  offenseJoint: new THREE.MeshStandardMaterial({ color: 0xf7be4e, roughness: 0.35 }),
-  defense: new THREE.MeshStandardMaterial({ color: 0x8de7cb, roughness: 0.45 }),
-  defenseJoint: new THREE.MeshStandardMaterial({ color: 0x243a36, roughness: 0.4 }),
-  ball: new THREE.MeshStandardMaterial({ color: 0xd8772d, roughness: 0.62 }),
+  paintFill: new THREE.MeshBasicMaterial({
+    color: 0x2587d8,
+    transparent: true,
+    opacity: 0.56,
+    side: THREE.DoubleSide
+  }),
+  keyFill: new THREE.MeshBasicMaterial({
+    color: 0xe56c2f,
+    transparent: true,
+    opacity: 0.72,
+    side: THREE.DoubleSide
+  }),
+  courtGlow: new THREE.MeshBasicMaterial({
+    color: 0x4bb6ff,
+    transparent: true,
+    opacity: 0.13,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending
+  }),
+  neonBlue: new THREE.MeshBasicMaterial({
+    color: 0x52d6ff,
+    transparent: true,
+    opacity: 0.58,
+    side: THREE.DoubleSide
+  }),
+  neonViolet: new THREE.MeshBasicMaterial({
+    color: 0xb35cff,
+    transparent: true,
+    opacity: 0.44,
+    side: THREE.DoubleSide
+  }),
+  offLimb: new THREE.MeshStandardMaterial({ color: 0x101719, roughness: 0.48 }),
+  offJersey: new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.42 }),
+  offShorts: new THREE.MeshStandardMaterial({ color: 0x111417, roughness: 0.5 }),
+  offShoe: new THREE.MeshStandardMaterial({ color: 0xf7be4e, roughness: 0.36 }),
+  defLimb: new THREE.MeshStandardMaterial({ color: 0x111719, roughness: 0.5 }),
+  defJersey: new THREE.MeshStandardMaterial({ color: 0xe8492d, roughness: 0.42 }),
+  defShorts: new THREE.MeshStandardMaterial({ color: 0x101316, roughness: 0.52 }),
+  defShoe: new THREE.MeshStandardMaterial({ color: 0x8de7cb, roughness: 0.38 }),
+  ball: new THREE.MeshStandardMaterial({ color: 0xe8752d, roughness: 0.54 }),
+  ballSeam: new THREE.MeshBasicMaterial({ color: 0x2a1408 }),
   black: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 }),
   rim: new THREE.MeshStandardMaterial({ color: 0xf16f31, roughness: 0.38 }),
-  metal: new THREE.MeshStandardMaterial({ color: 0xe6e1d1, roughness: 0.26, metalness: 0.25 }),
-  glass: new THREE.MeshStandardMaterial({
-    color: 0xd8f5ff,
-    transparent: true,
-    opacity: 0.28,
-    roughness: 0.18,
-    metalness: 0.02
-  }),
+  metal: new THREE.MeshStandardMaterial({ color: 0x14324b, roughness: 0.32, metalness: 0.18 }),
+  boardFace: new THREE.MeshStandardMaterial({ color: 0xf1f3ed, roughness: 0.34 }),
+  boardTrim: new THREE.MeshBasicMaterial({ color: 0x101418 }),
   net: new THREE.LineBasicMaterial({ color: 0xf9f7ee, transparent: true, opacity: 0.72 }),
-  shadow: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.24 }),
+  shadow: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32 }),
   glowGreen: new THREE.MeshBasicMaterial({ color: 0x96e1c8 }),
   glowGold: new THREE.MeshBasicMaterial({ color: 0xf7be4e })
 };
@@ -81,10 +123,11 @@ createHoop();
 
 const ball = new THREE.Mesh(new THREE.SphereGeometry(0.13, 28, 18), materials.ball);
 ball.castShadow = true;
+addBallSeams(ball);
 scene.add(ball);
 
 class StickPlayer {
-  constructor({ material, jointMaterial, accentMaterial }) {
+  constructor({ limbMaterial, jointMaterial, accentMaterial, jerseyMaterial, shortsMaterial, shoeMaterial }) {
     this.group = new THREE.Group();
     this.root = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
@@ -99,24 +142,29 @@ class StickPlayer {
     this.bite = 0;
     this.beat = 0;
     this.pivotSide = -1;
-    this.material = material;
+    this.material = limbMaterial;
     this.jointMaterial = jointMaterial;
     this.accentMaterial = accentMaterial;
+    this.jerseyMaterial = jerseyMaterial;
+    this.shortsMaterial = shortsMaterial;
+    this.shoeMaterial = shoeMaterial;
     this.parts = {
       hips: sphere(0.1, jointMaterial),
-      chest: sphere(0.12, jointMaterial),
+      chest: sphere(0.1, jointMaterial),
       head: sphere(0.15, jointMaterial),
       leftHand: sphere(0.08, jointMaterial),
       rightHand: sphere(0.08, jointMaterial),
-      leftFoot: foot(accentMaterial),
-      rightFoot: foot(accentMaterial),
+      leftFoot: foot(shoeMaterial),
+      rightFoot: foot(shoeMaterial),
+      jersey: new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), jerseyMaterial),
+      shorts: new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), shortsMaterial),
       pivot: ring(accentMaterial),
       ballHand: sphere(0.045, accentMaterial),
       limbs: []
     };
 
     for (let i = 0; i < 10; i += 1) {
-      const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1, 8), material);
+      const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1, 8), limbMaterial);
       limb.castShadow = true;
       this.parts.limbs.push(limb);
       this.group.add(limb);
@@ -220,6 +268,16 @@ class StickPlayer {
     this.parts.leftFoot.position.copy(pose.feet.left);
     this.parts.rightFoot.position.copy(pose.feet.right);
     this.parts.ballHand.position.copy(this.ballHand > 0 ? pose.hands.right : pose.hands.left);
+    placeBoxBetween(
+      this.parts.jersey,
+      tmpA.copy(pose.hips).add(new THREE.Vector3(0, 0.13, 0)),
+      tmpC.copy(pose.chest).add(new THREE.Vector3(0, -0.11, 0)),
+      0.54,
+      0.16
+    );
+    this.parts.shorts.position.copy(pose.hips).add(new THREE.Vector3(0, -0.19, 0.02));
+    this.parts.shorts.scale.set(0.58, 0.2, 0.24);
+    this.parts.shorts.quaternion.identity();
     this.parts.pivot.visible = game.state === 'stop' || game.state === 'contact' || game.state === 'shotFake';
     this.parts.pivot.position.copy(this.pivotSide > 0 ? pose.feet.right : pose.feet.left);
     this.parts.pivot.position.y = 0.025;
@@ -239,14 +297,20 @@ class StickPlayer {
 }
 
 const offense = new StickPlayer({
-  material: materials.offense,
-  jointMaterial: materials.offense,
-  accentMaterial: materials.glowGold
+  limbMaterial: materials.offLimb,
+  jointMaterial: materials.offLimb,
+  accentMaterial: materials.glowGold,
+  jerseyMaterial: materials.offJersey,
+  shortsMaterial: materials.offShorts,
+  shoeMaterial: materials.offShoe
 });
 const defense = new StickPlayer({
-  material: materials.defense,
-  jointMaterial: materials.defense,
-  accentMaterial: materials.glowGreen
+  limbMaterial: materials.defLimb,
+  jointMaterial: materials.defLimb,
+  accentMaterial: materials.glowGreen,
+  jerseyMaterial: materials.defJersey,
+  shortsMaterial: materials.defShorts,
+  shoeMaterial: materials.defShoe
 });
 
 const shadows = {
@@ -1032,10 +1096,21 @@ function createCourt() {
   floor.receiveShadow = true;
   scene.add(floor);
 
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(3.55, 64), materials.courtGlow);
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.set(0, 0.019, -0.75);
+  scene.add(glow);
+
+  paintPlane(0, -4.04, 3.86, 3.58, materials.paintFill, 0.021);
+  paintPlane(0, -5.55, 1.18, 0.58, materials.keyFill, 0.023);
+  paintPlane(0, 0.48, 1.58, 1.58, materials.keyFill, 0.021);
+  paintPlane(-3.86, -1.15, 0.05, 9.95, materials.neonBlue, 0.025);
+  paintPlane(3.86, -1.15, 0.05, 9.95, materials.neonViolet, 0.025);
+
   const gritty = new THREE.GridHelper(8.2, 18, 0x464844, 0x252724);
   gritty.position.set(0, 0.018, -1.05);
   gritty.material.transparent = true;
-  gritty.material.opacity = 0.22;
+  gritty.material.opacity = 0.18;
   scene.add(gritty);
 
   lineRect(-3.7, -6.5, 3.7, 3.7, materials.sideline);
@@ -1045,8 +1120,8 @@ function createCourt() {
   lineSegment(-2.35, 3.05, 2.35, 3.05, materials.paint);
 
   const logo = new THREE.Mesh(
-    new THREE.RingGeometry(0.78, 0.82, 64),
-    new THREE.MeshBasicMaterial({ color: 0xf7be4e, transparent: true, opacity: 0.17 })
+    new THREE.RingGeometry(0.82, 0.89, 64),
+    new THREE.MeshBasicMaterial({ color: 0xf7be4e, transparent: true, opacity: 0.27 })
   );
   logo.rotation.x = -Math.PI / 2;
   logo.position.set(0, 0.024, 0.45);
@@ -1054,15 +1129,23 @@ function createCourt() {
 }
 
 function createHoop() {
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 3.1, 16), materials.metal);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.1, 16), materials.metal);
   pole.position.set(0, 1.55, -6.65);
   pole.castShadow = true;
   scene.add(pole);
 
-  const board = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.92, 0.05), materials.glass);
-  board.position.set(0, 3.24, -6.36);
-  board.castShadow = true;
+  const boardTrim = new THREE.Mesh(new THREE.BoxGeometry(1.68, 1.02, 0.055), materials.boardTrim);
+  boardTrim.position.set(0, 3.24, -6.38);
+  scene.add(boardTrim);
+
+  const board = new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.86, 0.06), materials.boardFace);
+  board.position.set(0, 3.24, -6.34);
   scene.add(board);
+
+  addBackboardBar(0, 3.09, 0.52, 0.035);
+  addBackboardBar(0, 3.42, 0.52, 0.035);
+  addBackboardBar(-0.26, 3.255, 0.035, 0.33);
+  addBackboardBar(0.26, 3.255, 0.035, 0.33);
 
   const rimMesh = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.018, 10, 44), materials.rim);
   rimMesh.rotation.x = Math.PI / 2;
@@ -1077,6 +1160,12 @@ function createHoop() {
     const geo = new THREE.BufferGeometry().setFromPoints([top, bottom]);
     scene.add(new THREE.Line(geo, materials.net));
   }
+}
+
+function addBackboardBar(x, y, width, height) {
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.075), materials.boardTrim);
+  bar.position.set(x, y, -6.295);
+  scene.add(bar);
 }
 
 function lineRect(x1, z1, x2, z2, material) {
@@ -1104,6 +1193,68 @@ function lineArc(cx, cz, r, start, end, material) {
   scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), material));
 }
 
+function paintPlane(x, z, width, depth, material, y = 0.02) {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), material);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+  return mesh;
+}
+
+function createCourtTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(256, 220, 20, 256, 256, 390);
+  gradient.addColorStop(0, '#304256');
+  gradient.addColorStop(0.48, '#26394d');
+  gradient.addColorStop(1, '#11191f');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 512, 512);
+
+  ctx.globalAlpha = 0.1;
+  ctx.strokeStyle = '#f4f1e8';
+  for (let x = 0; x <= 512; x += 64) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x + 40, 512);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 0.16;
+  ctx.strokeStyle = '#080b0e';
+  for (let y = 18; y < 512; y += 34) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(512, y + 8);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 0.08;
+  for (let i = 0; i < 1800; i += 1) {
+    const v = 120 + Math.random() * 90;
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(Math.random() * 512, Math.random() * 512, 1, 1);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+function addBallSeams(targetBall) {
+  const seamGeometry = new THREE.TorusGeometry(0.132, 0.004, 8, 42);
+  const seamA = new THREE.Mesh(seamGeometry, materials.ballSeam);
+  const seamB = new THREE.Mesh(seamGeometry, materials.ballSeam);
+  const seamC = new THREE.Mesh(seamGeometry, materials.ballSeam);
+  seamA.rotation.x = Math.PI / 2;
+  seamB.rotation.y = Math.PI / 2;
+  seamC.rotation.set(Math.PI / 2, 0.62, 0);
+  targetBall.add(seamA, seamB, seamC);
+}
+
 function makeShadow(size = 0.68) {
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(size, 32), materials.shadow);
   shadow.rotation.x = -Math.PI / 2;
@@ -1116,7 +1267,7 @@ function sphere(radius, material) {
 }
 
 function foot(material) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.07, 0.16), material);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.08, 0.19), material);
   mesh.castShadow = true;
   return mesh;
 }
@@ -1133,6 +1284,14 @@ function placeLimb(mesh, a, b, radius) {
   const len = tmpB.length();
   mesh.position.copy(a).addScaledVector(tmpB, 0.5);
   mesh.scale.set(radius / 0.04, len, radius / 0.04);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tmpB.normalize());
+}
+
+function placeBoxBetween(mesh, a, b, width, depth) {
+  tmpB.copy(b).sub(a);
+  const len = tmpB.length();
+  mesh.position.copy(a).addScaledVector(tmpB, 0.5);
+  mesh.scale.set(width, len, depth);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tmpB.normalize());
 }
 
