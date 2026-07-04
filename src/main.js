@@ -21,6 +21,7 @@ const rim = new THREE.Vector3(0, 3.05, -5.85);
 const rimFloor = new THREE.Vector3(0, 0, -5.85);
 const courtBounds = { minX: -3.75, maxX: 3.75, minZ: -5.35, maxZ: 3.35 };
 const netLines = [];
+const roomCodeChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const tmpA = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
 const tmpC = new THREE.Vector3();
@@ -610,6 +611,9 @@ freeModeButton.addEventListener('click', () => setMode('free'));
 scoreModeButton.addEventListener('click', () => setMode('score'));
 hostButton.addEventListener('click', startOnlineHost);
 joinButton.addEventListener('click', startOnlineJoin);
+peerCodeInput.addEventListener('input', () => {
+  peerCodeInput.value = normalizeRoomCode(peerCodeInput.value);
+});
 labToggle.addEventListener('click', toggleLab);
 window.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() === 'l') toggleLab();
@@ -1583,18 +1587,41 @@ function startOnlineHost() {
     setOnlineStatus('PeerJS unavailable');
     return;
   }
+  if (online.role === 'host' && online.peer && online.hostId) {
+    peerCodeInput.value = online.hostId;
+    setOnlineStatus(`Code ${online.hostId} · waiting`);
+    return;
+  }
   closeOnline();
   online.role = 'host';
   setMode('score');
   setOnlineStatus('Creating host...');
-  online.peer = new window.Peer();
-  online.peer.on('open', (id) => {
+  createHostPeer();
+}
+
+function createHostPeer(attempt = 0) {
+  const hostId = makeRoomCode();
+  const peer = new window.Peer(hostId);
+  online.peer = peer;
+  online.hostId = hostId;
+  peerCodeInput.value = hostId;
+  peer.on('open', (id) => {
+    if (online.peer !== peer) return;
     online.hostId = id;
     peerCodeInput.value = id;
-    setOnlineStatus(`Host ID ${id} · waiting`);
+    setOnlineStatus(`Code ${id} · waiting`);
   });
-  online.peer.on('connection', (conn) => setupConnection(conn, 'host'));
-  online.peer.on('error', (error) => setOnlineStatus(`Host error: ${error.type || 'peer'}`));
+  peer.on('connection', (conn) => setupConnection(conn, 'host'));
+  peer.on('error', (error) => {
+    if (online.peer !== peer) return;
+    if (error.type === 'unavailable-id' && attempt < 6) {
+      peer.destroy();
+      setOnlineStatus('Code busy · retrying');
+      createHostPeer(attempt + 1);
+      return;
+    }
+    setOnlineStatus(`Host error: ${error.type || 'peer'}`);
+  });
 }
 
 function startOnlineJoin() {
@@ -1602,9 +1629,10 @@ function startOnlineJoin() {
     setOnlineStatus('PeerJS unavailable');
     return;
   }
-  const hostId = peerCodeInput.value.trim();
-  if (!hostId) {
-    setOnlineStatus('Enter host ID');
+  const hostId = normalizeRoomCode(peerCodeInput.value);
+  peerCodeInput.value = hostId;
+  if (hostId.length !== 4) {
+    setOnlineStatus('Enter 4-char code');
     return;
   }
   closeOnline();
@@ -1651,6 +1679,22 @@ function closeOnline() {
   online.remoteInput.active = false;
   online.snapshotTimer = 0;
   online.sendTimer = 0;
+}
+
+function makeRoomCode() {
+  let code = '';
+  for (let i = 0; i < 4; i += 1) {
+    code += roomCodeChars[Math.floor(Math.random() * roomCodeChars.length)];
+  }
+  return code;
+}
+
+function normalizeRoomCode(value) {
+  return String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .replace(/[IO01]/g, '')
+    .slice(0, 4);
 }
 
 function handleNetworkData(data) {

@@ -162,7 +162,9 @@ body {
   min-width: 0;
   width: 100%;
   padding: 0 8px;
-  text-transform: none;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
 .online-status {
