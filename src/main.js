@@ -177,10 +177,25 @@ class StickPlayer {
       rightHand: sphere(0.052, limbMaterial),
       leftFoot: foot(shoeMaterial),
       rightFoot: foot(shoeMaterial),
-      jersey: new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 1, 18), jerseyMaterial),
-      shorts: new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 1, 16), shortsMaterial),
+      jersey: new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.24, 8, 18), jerseyMaterial),
+      shorts: new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.06, 6, 16), shortsMaterial),
+      shoulderBridge: new THREE.Mesh(new THREE.CapsuleGeometry(0.034, 0.9, 5, 12), jerseyMaterial),
+      hipBridge: new THREE.Mesh(new THREE.CapsuleGeometry(0.034, 0.9, 5, 12), shortsMaterial),
       pivot: ring(accentMaterial),
       ballHand: sphere(0.045, accentMaterial),
+      joints: {
+        neck: sphere(0.052, limbMaterial),
+        leftShoulder: sphere(0.082, limbMaterial),
+        rightShoulder: sphere(0.082, limbMaterial),
+        leftElbow: sphere(0.058, limbMaterial),
+        rightElbow: sphere(0.058, limbMaterial),
+        leftHip: sphere(0.07, shortsMaterial),
+        rightHip: sphere(0.07, shortsMaterial),
+        leftKnee: sphere(0.062, limbMaterial),
+        rightKnee: sphere(0.062, limbMaterial),
+        leftAnkle: sphere(0.05, limbMaterial),
+        rightAnkle: sphere(0.05, limbMaterial)
+      },
       limbs: []
     };
 
@@ -196,6 +211,10 @@ class StickPlayer {
         part.castShadow = true;
         this.group.add(part);
       }
+    });
+    Object.values(this.parts.joints).forEach((joint) => {
+      joint.castShadow = true;
+      this.group.add(joint);
     });
     this.parts.hips.visible = false;
     this.parts.chest.visible = false;
@@ -303,6 +322,15 @@ class StickPlayer {
       activeHand.set(dribbleSide * 0.11, 2.24 + follow * 0.14, -0.03);
       offHand.set(offSide * 0.12, 2.04 - follow * 0.18, 0.03);
     }
+    const elbowDrop = this.action === 'shot' ? -0.03 : this.action === 'defense' ? -0.06 : -0.11;
+    const leftElbow = leftShoulder.clone().lerp(
+      dribbleSide > 0 ? offHand : activeHand,
+      0.52
+    ).add(new THREE.Vector3(-0.08, elbowDrop, 0.035));
+    const rightElbow = rightShoulder.clone().lerp(
+      dribbleSide > 0 ? activeHand : offHand,
+      0.52
+    ).add(new THREE.Vector3(0.08, elbowDrop, 0.035));
 
     return {
       hips,
@@ -310,6 +338,7 @@ class StickPlayer {
       head,
       shoulders: { left: leftShoulder, right: rightShoulder },
       hipsSide: { left: leftHip, right: rightHip },
+      elbows: { left: leftElbow, right: rightElbow },
       knees: { left: leftKnee, right: rightKnee },
       feet: { left: leftFoot, right: rightFoot },
       hands: dribbleSide > 0 ? { right: activeHand, left: offHand } : { left: activeHand, right: offHand }
@@ -351,23 +380,38 @@ class StickPlayer {
       0.46,
       0.2
     );
-    this.parts.shorts.position.copy(pose.hips).add(new THREE.Vector3(0, -0.14, 0.02));
-    this.parts.shorts.scale.set(0.48, 0.23, 0.24);
+    this.parts.shorts.position.copy(pose.hips).add(new THREE.Vector3(0, -0.07, 0.02));
+    this.parts.shorts.scale.set(0.48, 0.25, 0.26);
     this.parts.shorts.quaternion.identity();
+    placeLimb(this.parts.shoulderBridge, pose.shoulders.left, pose.shoulders.right, 0.036);
+    placeLimb(this.parts.hipBridge, pose.hipsSide.left, pose.hipsSide.right, 0.046);
+    this.parts.joints.neck.position.copy(tmpA.copy(pose.chest).lerp(pose.head, 0.34));
+    this.parts.joints.leftShoulder.position.copy(pose.shoulders.left);
+    this.parts.joints.rightShoulder.position.copy(pose.shoulders.right);
+    this.parts.joints.leftElbow.position.copy(pose.elbows.left);
+    this.parts.joints.rightElbow.position.copy(pose.elbows.right);
+    this.parts.joints.leftHip.position.copy(pose.hipsSide.left);
+    this.parts.joints.rightHip.position.copy(pose.hipsSide.right);
+    this.parts.joints.leftKnee.position.copy(pose.knees.left);
+    this.parts.joints.rightKnee.position.copy(pose.knees.right);
+    this.parts.joints.leftAnkle.position.copy(pose.feet.left);
+    this.parts.joints.rightAnkle.position.copy(pose.feet.right);
+    this.parts.joints.leftAnkle.position.y += 0.045;
+    this.parts.joints.rightAnkle.position.y += 0.045;
     this.parts.pivot.visible = game.state === 'stop' || game.state === 'contact' || game.state === 'shotFake';
     this.parts.pivot.position.copy(this.pivotSide > 0 ? pose.feet.right : pose.feet.left);
     this.parts.pivot.position.y = 0.025;
 
     const limbs = this.parts.limbs;
-    limbs[0].visible = false;
-    placeLimb(limbs[1], tmpA.copy(pose.chest).add(new THREE.Vector3(0, 0.03, 0)), pose.head, 0.025);
-    placeLimb(limbs[2], pose.shoulders.left, pose.hands.left, 0.026);
-    placeLimb(limbs[3], pose.shoulders.right, pose.hands.right, 0.026);
-    placeLimb(limbs[4], pose.hipsSide.left, pose.knees.left, 0.031);
-    placeLimb(limbs[5], pose.knees.left, pose.feet.left, 0.03);
-    placeLimb(limbs[6], pose.hipsSide.right, pose.knees.right, 0.031);
-    placeLimb(limbs[7], pose.knees.right, pose.feet.right, 0.03);
-    limbs[8].visible = false;
+    placeLimb(limbs[0], tmpA.copy(pose.chest).add(new THREE.Vector3(0, 0.03, 0)), pose.head, 0.03);
+    placeLimb(limbs[1], pose.shoulders.left, pose.elbows.left, 0.028);
+    placeLimb(limbs[2], pose.elbows.left, pose.hands.left, 0.026);
+    placeLimb(limbs[3], pose.shoulders.right, pose.elbows.right, 0.028);
+    placeLimb(limbs[4], pose.elbows.right, pose.hands.right, 0.026);
+    placeLimb(limbs[5], pose.hipsSide.left, pose.knees.left, 0.033);
+    placeLimb(limbs[6], pose.knees.left, pose.feet.left, 0.031);
+    placeLimb(limbs[7], pose.hipsSide.right, pose.knees.right, 0.033);
+    placeLimb(limbs[8], pose.knees.right, pose.feet.right, 0.031);
     limbs[9].visible = false;
   }
 }
@@ -1466,6 +1510,11 @@ function ring(material) {
 function placeLimb(mesh, a, b, radius) {
   tmpB.copy(b).sub(a);
   const len = tmpB.length();
+  if (len < 0.001) {
+    mesh.visible = false;
+    return;
+  }
+  mesh.visible = true;
   mesh.position.copy(a).addScaledVector(tmpB, 0.5);
   mesh.scale.set(radius / 0.04, len, radius / 0.04);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tmpB.normalize());
@@ -1474,6 +1523,11 @@ function placeLimb(mesh, a, b, radius) {
 function placeBoxBetween(mesh, a, b, width, depth) {
   tmpB.copy(b).sub(a);
   const len = tmpB.length();
+  if (len < 0.001) {
+    mesh.visible = false;
+    return;
+  }
+  mesh.visible = true;
   mesh.position.copy(a).addScaledVector(tmpB, 0.5);
   mesh.scale.set(width, len, depth);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tmpB.normalize());
