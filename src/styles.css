@@ -117,6 +117,79 @@ body {
   color: #101211;
 }
 
+.lab-toggle {
+  position: absolute;
+  top: max(92px, calc(env(safe-area-inset-top) + 92px));
+  right: 14px;
+  z-index: 3;
+  min-width: 48px;
+  min-height: 32px;
+  border: 1px solid rgba(150, 225, 200, 0.36);
+  border-radius: 7px;
+  background: rgba(9, 10, 9, 0.62);
+  color: rgba(244, 241, 232, 0.82);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(12px);
+}
+
+.lab-toggle.active {
+  background: #96e1c8;
+  color: #101211;
+}
+
+.lab-panel {
+  position: absolute;
+  top: max(130px, calc(env(safe-area-inset-top) + 130px));
+  right: 14px;
+  z-index: 3;
+  width: min(178px, calc(100vw - 28px));
+  padding: 10px;
+  border: 1px solid rgba(150, 225, 200, 0.32);
+  border-radius: 8px;
+  background: rgba(7, 9, 11, 0.76);
+  color: #f4f1e8;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.lab-panel.hidden {
+  display: none;
+}
+
+.lab-title {
+  margin-bottom: 7px;
+  color: #96e1c8;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.lab-readout {
+  display: grid;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.22;
+}
+
+.lab-readout span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(244, 241, 232, 0.66);
+}
+
+.lab-readout b {
+  color: #f4f1e8;
+  font-weight: 900;
+  text-align: right;
+}
+
 .result-panel {
   position: absolute;
   left: 18px;

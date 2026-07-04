@@ -9,6 +9,9 @@ const resultText = document.querySelector('#resultText');
 const breakdownEl = document.querySelector('#breakdown');
 const freeModeButton = document.querySelector('#freeMode');
 const scoreModeButton = document.querySelector('#scoreMode');
+const labToggle = document.querySelector('#labToggle');
+const labPanel = document.querySelector('#labPanel');
+const labReadout = document.querySelector('#labReadout');
 
 const rim = new THREE.Vector3(0, 3.05, -5.85);
 const rimFloor = new THREE.Vector3(0, 0, -5.85);
@@ -115,7 +118,14 @@ const materials = {
   net: new THREE.LineBasicMaterial({ color: 0xf9f7ee, transparent: true, opacity: 0.72 }),
   shadow: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32 }),
   glowGreen: new THREE.MeshBasicMaterial({ color: 0x96e1c8 }),
-  glowGold: new THREE.MeshBasicMaterial({ color: 0xf7be4e })
+  glowGold: new THREE.MeshBasicMaterial({ color: 0xf7be4e }),
+  labPlant: new THREE.MeshBasicMaterial({
+    color: 0x96e1c8,
+    transparent: true,
+    opacity: 0.72,
+    side: THREE.DoubleSide
+  }),
+  labTrail: new THREE.LineBasicMaterial({ color: 0xf7be4e, transparent: true, opacity: 0.86 })
 };
 
 createCourt();
@@ -128,6 +138,7 @@ scene.add(ball);
 
 class StickPlayer {
   constructor({
+    role = 'offense',
     limbMaterial,
     jointMaterial,
     headMaterial,
@@ -136,6 +147,7 @@ class StickPlayer {
     shortsMaterial,
     shoeMaterial
   }) {
+    this.role = role;
     this.group = new THREE.Group();
     this.root = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
@@ -203,19 +215,36 @@ class StickPlayer {
 
   getPose() {
     const speed = Math.min(this.velocity.length(), 5);
+    const isOffense = this.role === 'offense';
+    const activeMove = isOffense ? game.move : null;
+    const moveKind = activeMove?.kind || '';
+    const moveP = activeMove ? clamp01(activeMove.t / activeMove.duration) : 0;
+    const moveEase = Math.sin(moveP * Math.PI);
+    const crossLoad = moveKind === 'cross' ? moveEase : 0;
+    const retreatLoad = moveKind === 'snatchback' || moveKind === 'stepback' ? moveEase : 0;
+    const shotP = isOffense && game.shot ? clamp01((game.shot.t - 0.22) / 0.34) : 0;
     const stride = Math.sin(this.phase) * 0.16 * Math.min(speed / 3.2, 1);
     const cross = Math.cos(this.facing);
     const forward = Math.sin(this.facing);
-    const stance = this.action === 'defense' ? 0.34 : 0.26;
-    const low = this.action === 'defense' ? 0.09 : this.action === 'gather' ? -0.02 : 0;
-    const rise = this.action === 'shot' ? 0.24 : 0;
+    const stance =
+      (this.action === 'defense' ? 0.37 : this.action === 'shot' ? 0.22 : 0.26) +
+      crossLoad * 0.18 +
+      retreatLoad * 0.08 +
+      (this.action === 'gather' ? 0.08 : 0);
+    const low =
+      (this.action === 'defense' ? -0.08 : 0) +
+      (this.action === 'gather' ? -0.13 : 0) -
+      crossLoad * 0.12 -
+      retreatLoad * 0.05;
+    const rise = this.action === 'shot' ? 0.22 + Math.sin(shotP * Math.PI) * 0.12 : 0;
     const jump = this.contest > 0 ? 0.16 * Math.sin(this.contest * Math.PI) : 0;
-    const leanX = this.lean.x * 0.18 + this.shade * 0.08;
-    const leanZ = this.lean.y * 0.18 - this.beat * 0.05;
+    const moveLean = activeMove?.dir?.x || 0;
+    const leanX = this.lean.x * 0.18 + this.shade * 0.08 + crossLoad * moveLean * 0.18;
+    const leanZ = this.lean.y * 0.18 - this.beat * 0.05 + retreatLoad * 0.12;
     const hipY = 0.86 + low + rise + jump;
     const shoulderY = 1.48 + low + rise + jump;
-    const handDrop = this.action === 'shot' ? 0.95 : this.action === 'gather' ? 0.72 : 0.45;
     const handLift = this.action === 'shot' ? 0.98 : this.contest > 0 ? 0.72 : 0;
+    const footY = this.action === 'shot' ? 0.07 + rise * 0.16 : 0.035;
 
     const hips = new THREE.Vector3(leanX * 0.34, hipY, leanZ * 0.3);
     const chest = new THREE.Vector3(leanX, shoulderY, leanZ);
@@ -224,8 +253,21 @@ class StickPlayer {
     const rightHip = new THREE.Vector3(0.19 + leanX * 0.22, hipY - 0.04, leanZ * 0.16);
     const leftShoulder = new THREE.Vector3(-0.32 + leanX, shoulderY, leanZ);
     const rightShoulder = new THREE.Vector3(0.32 + leanX, shoulderY, leanZ);
-    const leftFoot = new THREE.Vector3(-stance - stride * cross, 0.035, stride * forward);
-    const rightFoot = new THREE.Vector3(stance + stride * cross, 0.035, -stride * forward);
+    const leftFoot = new THREE.Vector3(-stance - stride * cross, footY, stride * forward);
+    const rightFoot = new THREE.Vector3(stance + stride * cross, footY, -stride * forward);
+    if (crossLoad > 0) {
+      const dir = activeMove?.dir?.x || 1;
+      leftFoot.x -= 0.05 * crossLoad;
+      rightFoot.x += 0.05 * crossLoad;
+      leftFoot.z += (dir > 0 ? -0.06 : 0.1) * crossLoad;
+      rightFoot.z += (dir > 0 ? 0.1 : -0.06) * crossLoad;
+    }
+    if (this.action === 'gather') {
+      leftFoot.x *= 0.92;
+      rightFoot.x *= 0.92;
+      leftFoot.z -= 0.03;
+      rightFoot.z += 0.03;
+    }
     const leftKnee = leftHip.clone().lerp(leftFoot, 0.5).add(new THREE.Vector3(-0.06, -0.05, 0.05));
     const rightKnee = rightHip.clone().lerp(rightFoot, 0.5).add(new THREE.Vector3(0.06, -0.05, -0.05));
     const dribbleSide = this.ballHand;
@@ -233,7 +275,7 @@ class StickPlayer {
     const ballY = 0.48 + Math.abs(Math.sin(this.phase * 1.6)) * 0.36;
     const activeHand = new THREE.Vector3(
       dribbleSide * (0.34 + 0.08 * Math.sin(this.phase)),
-      this.action === 'shot' ? 2.35 : this.action === 'gather' ? 1.26 : ballY + handDrop * 0.05,
+      ballY + 0.02,
       0.08 + leanZ * 0.4
     );
     const offHand = new THREE.Vector3(
@@ -241,6 +283,25 @@ class StickPlayer {
       0.98 + handLift,
       0.02
     );
+    if (crossLoad > 0) {
+      const from = activeMove.fromHand ?? -dribbleSide;
+      const to = activeMove.toHand ?? dribbleSide;
+      const side = THREE.MathUtils.lerp(from, to, easeInOut(moveP));
+      activeHand.set(side * (0.5 - crossLoad * 0.08), 0.43 + crossLoad * 0.1, 0.18);
+      offHand.set(-side * 0.46, 0.82 - crossLoad * 0.08, -0.02);
+    } else if (retreatLoad > 0) {
+      activeHand.set(dribbleSide * 0.42, 0.62 + retreatLoad * 0.12, 0.22 + retreatLoad * 0.08);
+      offHand.set(offSide * 0.38, 0.94, -0.02);
+    }
+    if (this.action === 'gather') {
+      activeHand.set(dribbleSide * 0.12, 1.36, 0.06);
+      offHand.set(offSide * 0.12, 1.32, 0.08);
+    }
+    if (this.action === 'shot') {
+      const follow = isOffense && game.shot ? clamp01((game.shot.t - 0.42) / 0.32) : 0;
+      activeHand.set(dribbleSide * 0.11, 2.24 + follow * 0.14, -0.03);
+      offHand.set(offSide * 0.12, 2.04 - follow * 0.18, 0.03);
+    }
 
     return {
       hips,
@@ -309,6 +370,7 @@ class StickPlayer {
 }
 
 const offense = new StickPlayer({
+  role: 'offense',
   limbMaterial: materials.offSkin,
   jointMaterial: materials.offSkin,
   headMaterial: materials.offSkin,
@@ -318,6 +380,7 @@ const offense = new StickPlayer({
   shoeMaterial: materials.offShoe
 });
 const defense = new StickPlayer({
+  role: 'defense',
   limbMaterial: materials.defLimb,
   jointMaterial: materials.defLimb,
   headMaterial: materials.defLimb,
@@ -332,6 +395,7 @@ const shadows = {
   defense: makeShadow(),
   ball: makeShadow(0.32)
 };
+const labGuides = createLabGuides();
 
 const game = {
   mode: 'free',
@@ -362,7 +426,8 @@ const game = {
   defenderCrowd: 0,
   shot: null,
   replay: null,
-  feedback: null
+  feedback: null,
+  lab: false
 };
 
 const input = {
@@ -395,6 +460,10 @@ renderer.domElement.addEventListener('pointerup', onPointerUp);
 renderer.domElement.addEventListener('pointercancel', onPointerUp);
 freeModeButton.addEventListener('click', () => setMode('free'));
 scoreModeButton.addEventListener('click', () => setMode('score'));
+labToggle.addEventListener('click', toggleLab);
+window.addEventListener('keydown', (event) => {
+  if (event.key.toLowerCase() === 'l') toggleLab();
+});
 
 requestAnimationFrame(loop);
 
@@ -430,6 +499,7 @@ function update(dt) {
   defense.update(dt);
   updateBall();
   updateCamera(dt);
+  updateLab();
   updateUI();
 }
 
@@ -511,7 +581,7 @@ function applyMove(dt, desired) {
     game.balance = clamp01(game.balance + dt * 0.2);
   }
 
-  if (p > 0.38 && !move.handChanged) {
+  if (p > 0.52 && !move.handChanged) {
     if (move.kind === 'cross') offense.ballHand *= -1;
     move.handChanged = true;
   }
@@ -644,7 +714,15 @@ function updateShot(dt) {
 
   if (shot.t < releaseDelay) {
     offense.action = 'gather';
-    ball.position.copy(offense.handWorld(offense.ballHand));
+    const p = easeInOut(clamp01(shot.t / releaseDelay));
+    const gatherPocket = offense.group.localToWorld(
+      new THREE.Vector3(
+        offense.ballHand * THREE.MathUtils.lerp(0.34, 0.1, p),
+        THREE.MathUtils.lerp(0.64, 1.72, p),
+        THREE.MathUtils.lerp(0.14, 0.0, p)
+      )
+    );
+    ball.position.copy(gatherPocket);
     return;
   }
 
@@ -685,6 +763,33 @@ function updateBall() {
   if (game.shot) {
     shadows.ball.position.set(ball.position.x, 0.012, ball.position.z);
     shadows.ball.scale.setScalar(clamp(0.3 - ball.position.y * 0.04, 0.12, 0.3));
+    return;
+  }
+
+  if (game.move?.kind === 'cross') {
+    const p = clamp01(game.move.t / game.move.duration);
+    const side = THREE.MathUtils.lerp(game.move.fromHand, game.move.toHand, easeInOut(p));
+    const pocket = Math.sin(p * Math.PI);
+    ball.position.set(
+      offense.root.x + side * (0.5 - pocket * 0.08),
+      0.3 + pocket * 0.12,
+      offense.root.z + 0.18 + pocket * 0.04
+    );
+    shadows.ball.position.set(ball.position.x, 0.012, ball.position.z);
+    shadows.ball.scale.setScalar(0.26);
+    return;
+  }
+
+  if (game.move && (game.move.kind === 'snatchback' || game.move.kind === 'stepback')) {
+    const p = clamp01(game.move.t / game.move.duration);
+    const pocket = Math.sin(p * Math.PI);
+    ball.position.set(
+      offense.root.x + offense.ballHand * 0.42,
+      0.48 + pocket * 0.16,
+      offense.root.z + 0.24 + pocket * 0.08
+    );
+    shadows.ball.position.set(ball.position.x, 0.012, ball.position.z);
+    shadows.ball.scale.setScalar(0.26);
     return;
   }
 
@@ -850,6 +955,8 @@ function startMove(kind, dir) {
     duration: durations[kind],
     dir: new THREE.Vector3(x, 0, dir.z),
     forward: kind === 'cross' && dir.z < 0 ? -0.35 : 0.1,
+    fromHand: offense.ballHand,
+    toHand: kind === 'cross' ? -offense.ballHand : offense.ballHand,
     handChanged: false
   };
 
@@ -908,8 +1015,7 @@ function startShot() {
 
   setState('shot');
   offense.velocity.multiplyScalar(0.28);
-  const start = offense.handWorld(offense.ballHand);
-  start.y = 2.25;
+  const start = offense.group.localToWorld(new THREE.Vector3(offense.ballHand * 0.1, 2.24, -0.02));
   const missX = made ? 0 : (Math.random() > 0.5 ? 1 : -1) * THREE.MathUtils.lerp(0.28, 0.66, 1 - metrics.quality);
   const end = new THREE.Vector3(rim.x + missX, made ? 2.72 : 3.0, rim.z + (made ? 0.02 : -0.05));
   const arc = THREE.MathUtils.lerp(1.05, 1.58, clamp01(flatDistance(offense.root, rimFloor) / 8));
@@ -1067,6 +1173,7 @@ function resetPossession(initial) {
   game.defenderCrowd = 0;
   game.lastMove = initial ? 'check' : 'reset';
   game.lastMoveTime = 2;
+  labGuides.trail.length = 0;
   input.active = false;
   if (game.mode === 'score' && (game.userScore >= game.targetScore || game.aiScore >= game.targetScore)) {
     resultText.textContent = game.userScore >= game.targetScore ? 'Game' : 'Clamped';
@@ -1093,6 +1200,48 @@ function setState(state) {
 function updateUI() {
   scoreEl.textContent = game.mode === 'score' ? `${game.userScore} - ${game.aiScore}` : '0 - 0';
   clockEl.textContent = game.mode === 'score' ? game.shotClock.toFixed(1) : 'FREE';
+}
+
+function toggleLab() {
+  game.lab = !game.lab;
+  labToggle.classList.toggle('active', game.lab);
+  labPanel.classList.toggle('hidden', !game.lab);
+  if (!game.lab) labGuides.trail.length = 0;
+}
+
+function updateLab() {
+  labGuides.group.visible = game.lab;
+  if (!game.lab) return;
+
+  const left = offense.parts.leftFoot.getWorldPosition(new THREE.Vector3());
+  const right = offense.parts.rightFoot.getWorldPosition(new THREE.Vector3());
+  labGuides.leftPlant.position.set(left.x, 0.05, left.z);
+  labGuides.rightPlant.position.set(right.x, 0.05, right.z);
+  labGuides.leftPlant.scale.setScalar(offense.pivotSide < 0 ? 1.14 : 0.94);
+  labGuides.rightPlant.scale.setScalar(offense.pivotSide > 0 ? 1.14 : 0.94);
+
+  const last = labGuides.trail[labGuides.trail.length - 1];
+  if (!last || last.distanceTo(ball.position) > 0.045) {
+    labGuides.trail.push(ball.position.clone());
+    while (labGuides.trail.length > 30) labGuides.trail.shift();
+  }
+  const trail = labGuides.trail.length > 1 ? labGuides.trail : [ball.position, ball.position];
+  labGuides.trailLine.geometry.setFromPoints(trail);
+
+  const metrics = game.shot?.metrics || shotMetrics();
+  const movePhase = game.move ? `${game.move.kind} ${Math.round((game.move.t / game.move.duration) * 100)}%` : '-';
+  labReadout.innerHTML = [
+    ['state', game.state],
+    ['move', movePhase],
+    ['hand', offense.ballHand > 0 ? 'right' : 'left'],
+    ['sep', `${metrics.sep.toFixed(2)}m`],
+    ['balance', metrics.balance.toFixed(2)],
+    ['release', metrics.release.toFixed(2)],
+    ['contest', metrics.contest.toFixed(2)],
+    ['quality', metrics.quality.toFixed(2)]
+  ]
+    .map(([key, value]) => `<span>${key}<b>${value}</b></span>`)
+    .join('');
 }
 
 function resize() {
@@ -1274,6 +1423,23 @@ function makeShadow(size = 0.68) {
   shadow.rotation.x = -Math.PI / 2;
   scene.add(shadow);
   return shadow;
+}
+
+function createLabGuides() {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  const plantGeometry = new THREE.RingGeometry(0.18, 0.22, 36);
+  const leftPlant = new THREE.Mesh(plantGeometry, materials.labPlant);
+  const rightPlant = new THREE.Mesh(plantGeometry, materials.labPlant);
+  leftPlant.rotation.x = -Math.PI / 2;
+  rightPlant.rotation.x = -Math.PI / 2;
+
+  const trailLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([ball.position, ball.position]), materials.labTrail);
+  group.add(leftPlant, rightPlant, trailLine);
+  scene.add(group);
+
+  return { group, leftPlant, rightPlant, trailLine, trail: [] };
 }
 
 function sphere(radius, material) {
