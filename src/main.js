@@ -97,10 +97,10 @@ const materials = {
     opacity: 0.44,
     side: THREE.DoubleSide
   }),
-  offLimb: new THREE.MeshStandardMaterial({ color: 0x101719, roughness: 0.48 }),
-  offJersey: new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.42 }),
-  offShorts: new THREE.MeshStandardMaterial({ color: 0x111417, roughness: 0.5 }),
-  offShoe: new THREE.MeshStandardMaterial({ color: 0xf7be4e, roughness: 0.36 }),
+  offSkin: new THREE.MeshStandardMaterial({ color: 0xf1dfc7, roughness: 0.5 }),
+  offJersey: new THREE.MeshStandardMaterial({ color: 0x245ef2, roughness: 0.4 }),
+  offShorts: new THREE.MeshStandardMaterial({ color: 0x245ef2, roughness: 0.43 }),
+  offShoe: new THREE.MeshStandardMaterial({ color: 0x131821, roughness: 0.36 }),
   defLimb: new THREE.MeshStandardMaterial({ color: 0x111719, roughness: 0.5 }),
   defJersey: new THREE.MeshStandardMaterial({ color: 0xe8492d, roughness: 0.42 }),
   defShorts: new THREE.MeshStandardMaterial({ color: 0x101316, roughness: 0.52 }),
@@ -127,7 +127,15 @@ addBallSeams(ball);
 scene.add(ball);
 
 class StickPlayer {
-  constructor({ limbMaterial, jointMaterial, accentMaterial, jerseyMaterial, shortsMaterial, shoeMaterial }) {
+  constructor({
+    limbMaterial,
+    jointMaterial,
+    headMaterial,
+    accentMaterial,
+    jerseyMaterial,
+    shortsMaterial,
+    shoeMaterial
+  }) {
     this.group = new THREE.Group();
     this.root = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
@@ -144,20 +152,21 @@ class StickPlayer {
     this.pivotSide = -1;
     this.material = limbMaterial;
     this.jointMaterial = jointMaterial;
+    this.headMaterial = headMaterial;
     this.accentMaterial = accentMaterial;
     this.jerseyMaterial = jerseyMaterial;
     this.shortsMaterial = shortsMaterial;
     this.shoeMaterial = shoeMaterial;
     this.parts = {
-      hips: sphere(0.1, jointMaterial),
-      chest: sphere(0.1, jointMaterial),
-      head: sphere(0.15, jointMaterial),
-      leftHand: sphere(0.08, jointMaterial),
-      rightHand: sphere(0.08, jointMaterial),
+      hips: sphere(0.045, shortsMaterial),
+      chest: sphere(0.045, jerseyMaterial),
+      head: sphere(0.115, headMaterial),
+      leftHand: sphere(0.052, limbMaterial),
+      rightHand: sphere(0.052, limbMaterial),
       leftFoot: foot(shoeMaterial),
       rightFoot: foot(shoeMaterial),
-      jersey: new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), jerseyMaterial),
-      shorts: new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), shortsMaterial),
+      jersey: new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 1, 18), jerseyMaterial),
+      shorts: new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 1, 16), shortsMaterial),
       pivot: ring(accentMaterial),
       ballHand: sphere(0.045, accentMaterial),
       limbs: []
@@ -176,6 +185,8 @@ class StickPlayer {
         this.group.add(part);
       }
     });
+    this.parts.hips.visible = false;
+    this.parts.chest.visible = false;
     this.group.add(this.parts.pivot);
     scene.add(this.group);
   }
@@ -263,6 +274,7 @@ class StickPlayer {
     this.parts.hips.position.copy(pose.hips);
     this.parts.chest.position.copy(pose.chest);
     this.parts.head.position.copy(pose.head);
+    this.parts.head.scale.set(0.82, 1.12, 0.78);
     this.parts.leftHand.position.copy(pose.hands.left);
     this.parts.rightHand.position.copy(pose.hands.right);
     this.parts.leftFoot.position.copy(pose.feet.left);
@@ -270,35 +282,36 @@ class StickPlayer {
     this.parts.ballHand.position.copy(this.ballHand > 0 ? pose.hands.right : pose.hands.left);
     placeBoxBetween(
       this.parts.jersey,
-      tmpA.copy(pose.hips).add(new THREE.Vector3(0, 0.13, 0)),
-      tmpC.copy(pose.chest).add(new THREE.Vector3(0, -0.11, 0)),
-      0.54,
-      0.16
+      tmpA.copy(pose.hips).add(new THREE.Vector3(0, 0.04, 0)),
+      tmpC.copy(pose.chest).add(new THREE.Vector3(0, -0.09, 0)),
+      0.46,
+      0.2
     );
-    this.parts.shorts.position.copy(pose.hips).add(new THREE.Vector3(0, -0.19, 0.02));
-    this.parts.shorts.scale.set(0.58, 0.2, 0.24);
+    this.parts.shorts.position.copy(pose.hips).add(new THREE.Vector3(0, -0.14, 0.02));
+    this.parts.shorts.scale.set(0.48, 0.23, 0.24);
     this.parts.shorts.quaternion.identity();
     this.parts.pivot.visible = game.state === 'stop' || game.state === 'contact' || game.state === 'shotFake';
     this.parts.pivot.position.copy(this.pivotSide > 0 ? pose.feet.right : pose.feet.left);
     this.parts.pivot.position.y = 0.025;
 
     const limbs = this.parts.limbs;
-    placeLimb(limbs[0], pose.hips, pose.chest, 0.045);
-    placeLimb(limbs[1], pose.chest, pose.head, 0.04);
-    placeLimb(limbs[2], pose.shoulders.left, pose.hands.left, 0.035);
-    placeLimb(limbs[3], pose.shoulders.right, pose.hands.right, 0.035);
-    placeLimb(limbs[4], pose.hipsSide.left, pose.knees.left, 0.04);
-    placeLimb(limbs[5], pose.knees.left, pose.feet.left, 0.038);
-    placeLimb(limbs[6], pose.hipsSide.right, pose.knees.right, 0.04);
-    placeLimb(limbs[7], pose.knees.right, pose.feet.right, 0.038);
-    placeLimb(limbs[8], pose.shoulders.left, pose.shoulders.right, 0.035);
-    placeLimb(limbs[9], pose.hipsSide.left, pose.hipsSide.right, 0.035);
+    limbs[0].visible = false;
+    placeLimb(limbs[1], tmpA.copy(pose.chest).add(new THREE.Vector3(0, 0.03, 0)), pose.head, 0.025);
+    placeLimb(limbs[2], pose.shoulders.left, pose.hands.left, 0.026);
+    placeLimb(limbs[3], pose.shoulders.right, pose.hands.right, 0.026);
+    placeLimb(limbs[4], pose.hipsSide.left, pose.knees.left, 0.031);
+    placeLimb(limbs[5], pose.knees.left, pose.feet.left, 0.03);
+    placeLimb(limbs[6], pose.hipsSide.right, pose.knees.right, 0.031);
+    placeLimb(limbs[7], pose.knees.right, pose.feet.right, 0.03);
+    limbs[8].visible = false;
+    limbs[9].visible = false;
   }
 }
 
 const offense = new StickPlayer({
-  limbMaterial: materials.offLimb,
-  jointMaterial: materials.offLimb,
+  limbMaterial: materials.offSkin,
+  jointMaterial: materials.offSkin,
+  headMaterial: materials.offSkin,
   accentMaterial: materials.glowGold,
   jerseyMaterial: materials.offJersey,
   shortsMaterial: materials.offShorts,
@@ -307,6 +320,7 @@ const offense = new StickPlayer({
 const defense = new StickPlayer({
   limbMaterial: materials.defLimb,
   jointMaterial: materials.defLimb,
+  headMaterial: materials.defLimb,
   accentMaterial: materials.glowGreen,
   jerseyMaterial: materials.defJersey,
   shortsMaterial: materials.defShorts,
@@ -1267,7 +1281,8 @@ function sphere(radius, material) {
 }
 
 function foot(material) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.08, 0.19), material);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 10), material);
+  mesh.scale.set(1.75, 0.34, 0.78);
   mesh.castShadow = true;
   return mesh;
 }
