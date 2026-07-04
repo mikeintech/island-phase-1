@@ -38,10 +38,11 @@
   button{pointer-events:auto;background:none;border:1.5px solid var(--dim);color:var(--bone);
     font-family:inherit;font-weight:800;letter-spacing:.14em;cursor:pointer;border-radius:2px}
   button:active{background:var(--bone);color:var(--ink)}
-  #btnBack,#btnDiff{position:absolute;z-index:8;display:none;font-size:10px;padding:7px 10px;
+  #btnBack,#btnDiff,#btnHelp{position:absolute;z-index:8;display:none;font-size:10px;padding:7px 10px;
     top:calc(64px + env(safe-area-inset-top));background:rgba(12,11,14,.5)}
   #btnBack{right:14px}
-  #btnDiff{right:64px}
+  #btnHelp{right:58px}
+  #btnDiff{right:102px}
 
   /* ---- banner / chips / cue ---- */
   #banner{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;z-index:6;
@@ -104,6 +105,15 @@
   .howto{margin-top:14px;font-size:10px;line-height:2;letter-spacing:.1em;color:var(--dim);
     text-align:left;border-top:1px solid var(--dim2);padding-top:12px;width:min(78vw,290px)}
   .howto b{color:var(--bone);font-weight:800}
+  #helpMenu{position:absolute;right:14px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:12;
+    width:min(84vw,330px);display:none;text-align:left;background:rgba(9,8,11,.92);
+    border:1.5px solid var(--dim2);padding:14px 14px 12px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+  #helpMenu.show{display:block}
+  #helpMenu .hTop{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:10px}
+  #helpMenu .hTitle{font-size:13px;font-weight:900;letter-spacing:.2em;color:var(--gold)}
+  #helpMenu button{font-size:10px;padding:6px 9px}
+  #helpMenu .hRows{font-size:10px;line-height:1.9;letter-spacing:.1em;color:var(--dim)}
+  #helpMenu b{color:var(--bone)}
   #endTitle{font-size:56px}
   .goldT{color:var(--gold)}
   .heatT{color:var(--heat)}
@@ -127,6 +137,7 @@
   </div>
   <div id="modeTag"></div>
   <button id="btnBack">✕</button>
+  <button id="btnHelp">?</button>
   <button id="btnDiff">MED</button>
 
   <div id="banner"><div id="bMain" class="disp"></div><div id="bSub"></div></div>
@@ -135,7 +146,17 @@
   <div id="checkPrompt">TAP TO CHECK BALL</div>
   <div id="hint">
     HOLD + DRAG&nbsp;·&nbsp;DRIBBLE &nbsp;&nbsp; FLICK&nbsp;·&nbsp;BREAK HIM DOWN<br/>
-    PAUSE MID-MOVE&nbsp;·&nbsp;HESI &nbsp;&nbsp; LET GO&nbsp;·&nbsp;SHOOT &nbsp;&nbsp; TAP BACK FAST&nbsp;·&nbsp;PUMP FAKE
+    PAUSE MID-MOVE&nbsp;·&nbsp;HESI &nbsp;&nbsp; BACK-DIAG CROWDED&nbsp;·&nbsp;SPIN &nbsp;&nbsp; LET GO&nbsp;·&nbsp;SHOOT
+  </div>
+  <div id="helpMenu">
+    <div class="hTop"><div class="hTitle">HOW TO PLAY</div><button id="btnHelpClose">CLOSE</button></div>
+    <div class="hRows">
+      <b>Drag</b> to probe, slide, or attack based on distance.<br/>
+      <b>Flick across your body</b> while moving for a low between-leg counter.<br/>
+      <b>Flick diagonal forward</b> for a curl cross into the lane.<br/>
+      <b>Flick back</b> for snatchback. <b>Back-diagonal</b> gives stepback, or spin when crowded.<br/>
+      <b>Pause while moving</b> for a one-hand hesi. Release to gather and shoot. Tap right back to pump fake.
+    </div>
   </div>
 
   <div id="replayTag">● REPLAY</div>
@@ -156,7 +177,8 @@
       <b>one thumb.</b> lower half of the screen.<br/>
       <b>hold + drag</b> — dribble, probe, drive<br/>
       <b>flick left / right</b> — cross · in-and-out<br/>
-      <b>flick back</b> — snatchback&nbsp;&nbsp;<b>back-diagonal</b> — stepback<br/>
+      <b>flick across body</b> — between-leg counter<br/>
+      <b>flick back</b> — snatchback&nbsp;&nbsp;<b>back-diagonal</b> — stepback or spin<br/>
       <b>drive into his chest</b> — bump stop, then pivot<br/>
       <b>release</b> — shoot&nbsp;&nbsp;<b>tap right back</b> — pump fake<br/>
       miss or get stripped in FIRST TO 7 and the stop counts for DEF.
@@ -238,6 +260,7 @@ const ui = {
   sy: $('sy'), sd: $('sd'), clock: $('clock'), modeTag: $('modeTag'), hud: $('hud'),
   banner: $('banner'), bMain: $('bMain'), bSub: $('bSub'), chips: $('chips'),
   checkPrompt: $('checkPrompt'), hint: $('hint'), cue: $('cue'),
+  helpMenu: $('helpMenu'), btnHelp: $('btnHelp'), btnHelpClose: $('btnHelpClose'),
   menu: $('menu'), end: $('end'), endTitle: $('endTitle'), endSub: $('endSub'),
   btnFree: $('btnFree'), btnMatch: $('btnMatch'), btnRematch: $('btnRematch'),
   btnMenu2: $('btnMenu2'), btnBack: $('btnBack'), btnDiff: $('btnDiff'),
@@ -854,7 +877,7 @@ function ptXY(e) {
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 stage.addEventListener('pointerdown', e => {
-  if (e.target.closest('button') || e.target.closest('.panel')) return;
+  if (e.target.closest('button') || e.target.closest('.panel') || e.target.closest('#helpMenu')) return;
   audioInit();
   if (G.phase === 'menu' || G.phase === 'over') return;
   if (Replay.on) { Replay.skip = true; return; }
@@ -977,6 +1000,19 @@ function startMove(type, dir, wx, wz) {
       impulse(rx * dir * 0.55 + fx * 0.75, rz * dir * 0.55 + fz * 0.75);
       D.event('drive', dir, 0.85); SND.squeak(0.75); chainUp(2);
       break;
+    case 'between':
+      M.dur = 0.44; M.toHand = -O.hand; O.lowT = 0.30; O.hang = 0.08;
+      impulse(-fx * 0.35 + rx * dir * 0.85, -fz * 0.35 + rz * dir * 0.85);
+      O.windowT = 0.42; O.windowType = 'between';
+      D.event('lat', dir, 0.72); SND.squeak(0.55); chainUp(2);
+      break;
+    case 'spin':
+      M.dur = 0.52; M.toHand = -O.hand; M.spinStart = O.yaw;
+      O.lowT = 0.16; O.hang = 0.06;
+      impulse(fx * 1.1 + rx * dir * 1.45, fz * 1.1 + rz * dir * 1.45);
+      O.windowT = 0.50; O.windowType = 'spin';
+      D.event('lat', -dir, 0.7); SND.squeak(1); chainUp(2);
+      break;
     case 'inout':
       M.dur = 0.34; M.fakeDir = dir;
       D.event('lat', dir, 0.7); SND.squeak(0.4); chainUp();
@@ -1027,6 +1063,10 @@ function interpretFlick(f) {
   }
   if (fw > 0.18 && Math.abs(lt) >= 0.42) { startMove('curlcross', sgn(lt), f.x, f.z); return; }
   if (fw > 0.6 && Math.abs(lt) < 0.55) { startMove('burst', sgn(lt || rand(-1, 1)), f.x, f.z); return; }
+  if (fw < -0.28 && Math.abs(lt) > 0.62 && dDist < 1.35 && O.spdMem > 1.2) {
+    startMove('spin', sgn(lt));
+    return;
+  }
   if (fw < -0.4 && Math.abs(lt) > 0.42) { startMove('stepback', sgn(lt)); return; }
   if (fw < -0.55) {
     if (O.vx * fx + O.vz * fz > 1.5) startMove('snatch', 0);
@@ -1035,6 +1075,7 @@ function interpretFlick(f) {
   }
   if (Math.abs(lt) >= 0.5) {
     const dir = sgn(lt);
+    if (dir === -O.hand && O.spdMem > 0.9) { startMove('between', dir); return; }
     if (dLat * dir > 0.28) startMove('inout', dir);
     else startMove('cross', dir);
     return;
@@ -1161,7 +1202,9 @@ function offenseUpdate(dt) {
       if (inp.flickWorld && !O.move) interpretFlick(inp.flickWorld);
       else if (inp.flickWorld && O.move) {
         const p = O.move.t / O.move.dur;
-        const canCancel = (O.move.type === 'hesi' && p > 0.22) || p > 0.46 || O.move.type === 'inout';
+        const canCancel = (O.move.type === 'hesi' && p > 0.22) || p > 0.46 ||
+          O.move.type === 'inout' || (O.move.type === 'between' && p > 0.52) ||
+          (O.move.type === 'spin' && p > 0.62);
         if (canCancel) { O.move = null; interpretFlick(inp.flickWorld); }
       }
     } else {
@@ -1194,6 +1237,29 @@ function offenseUpdate(dt) {
         }
         if (t < 0.36) O.hang = Math.max(O.hang, 0.05);
       }
+      if (M.type === 'between') {
+        const t = clamp(M.t / M.dur, 0, 1);
+        const snap = smooth(0.36, 0.84, t);
+        O.crouch = dampN(O.crouch, 0.55, 16, dt);
+        O.lowT = Math.max(O.lowT, 0.06);
+        O.latTgt = lerp(M.fromHand * 0.82, M.toHand * 0.82, snap);
+        O.fwdOff = lerp(0.02, 0.16, snap);
+        if (!M.snapped && t > 0.58) {
+          M.snapped = true; O.hand = M.toHand;
+          impulse(rx * M.dir * 1.95 + fx * 0.45, rz * M.dir * 1.95 + fz * 0.45);
+        }
+      }
+      if (M.type === 'spin') {
+        const t = clamp(M.t / M.dur, 0, 1);
+        const turn = smooth(0.04, 0.94, t);
+        O.yaw = M.spinStart + M.dir * Math.PI * 2 * turn;
+        O.latTgt = lerp(M.fromHand, M.toHand, smooth(0.44, 0.88, t));
+        O.fwdOff = lerp(-0.10, 0.18, smooth(0.30, 0.92, t));
+        if (!M.snapped && t > 0.60) {
+          M.snapped = true; O.hand = M.toHand;
+          impulse(fx * 1.35 + rx * M.dir * 0.75, fz * 1.35 + rz * M.dir * 0.75);
+        }
+      }
       if (M.type === 'inout') {
         const t = M.t / M.dur;
         O.latTgt = t < 0.45 ? lerp(O.hand, -O.hand * 0.55, t / 0.45) : lerp(-O.hand * 0.55, O.hand, (t - 0.45) / 0.55);
@@ -1202,9 +1268,9 @@ function offenseUpdate(dt) {
       if (M.type === 'hesi') O.crouch = dampN(O.crouch, 0.12, 14, dt);
       if (M.type === 'stepthrough' && M.t >= M.dur) { O.move = null; tryShoot(); }
       else if (M.t >= M.dur) {
-        if (M.type === 'cross' || M.type === 'curlcross') {
+        if (M.type === 'cross' || M.type === 'curlcross' || M.type === 'between' || M.type === 'spin') {
           O.hand = M.toHand; O.latTgt = O.hand;
-          if (M.type === 'curlcross') O.burstT = Math.max(O.burstT, 0.18);
+          if (M.type === 'curlcross' || M.type === 'spin') O.burstT = Math.max(O.burstT, 0.18);
         }
         if (M.type === 'snatch') O.fwdOff = 0.14;
         if (M.type !== 'inout') O.latTgt = O.hand;
@@ -1218,18 +1284,20 @@ function offenseUpdate(dt) {
     const base = O.pickedUp ? 0.42 : (inp.active && inp.mag < 0.12 && O.spd < 0.8 ? 0.46 : 0.32 + Math.min(0.14, O.spd * 0.03));
     if (!O.move || O.move.type !== 'hesi') O.crouch = dampN(O.crouch, base, 8, dt);
     // face rim, lean into speed
-    let wantYaw = Math.atan2(fx, fz);
-    if (O.spd > 2.6) {
-      const vy = Math.atan2(O.vx / O.spd, O.vz / O.spd);
-      let dyaw = vy - wantYaw;
-      while (dyaw > Math.PI) dyaw -= Math.PI * 2;
-      while (dyaw < -Math.PI) dyaw += Math.PI * 2;
-      wantYaw += clamp(dyaw, -0.7, 0.7) * 0.5;
+    if (!(O.move && O.move.type === 'spin')) {
+      let wantYaw = Math.atan2(fx, fz);
+      if (O.spd > 2.6) {
+        const vy = Math.atan2(O.vx / O.spd, O.vz / O.spd);
+        let dyaw = vy - wantYaw;
+        while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+        while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+        wantYaw += clamp(dyaw, -0.7, 0.7) * 0.5;
+      }
+      let dy2 = wantYaw - O.yaw;
+      while (dy2 > Math.PI) dy2 -= Math.PI * 2;
+      while (dy2 < -Math.PI) dy2 += Math.PI * 2;
+      O.yaw += dy2 * Math.min(1, 10 * dt);
     }
-    let dy2 = wantYaw - O.yaw;
-    while (dy2 > Math.PI) dy2 -= Math.PI * 2;
-    while (dy2 < -Math.PI) dy2 += Math.PI * 2;
-    O.yaw += dy2 * Math.min(1, 10 * dt);
   }
 
   /* timers */
@@ -1332,6 +1400,8 @@ function releaseBall() {
 
   let balance = clamp(1 - O.speedAtGather / 5.2, 0, 1);
   if (O.windowT > 0 && (O.windowType === 'step' || O.windowType === 'snatch')) balance = Math.max(balance, 0.88);
+  if (O.windowT > 0 && O.windowType === 'between') balance = Math.max(balance, 0.82);
+  if (O.windowT > 0 && O.windowType === 'spin') balance = Math.max(balance, 0.74);
   if (O.shotType === 'fade' && !(O.windowType === 'step' && O.windowT > 0)) balance *= 0.72;
   if (O.midMoveAtG) balance *= 0.7;
 
@@ -1666,7 +1736,9 @@ G.startGame = function (mode) {
   ui.hud.style.display = 'flex';
   ui.modeTag.textContent = mode === 'match' ? 'FIRST TO 7 · ' + diffKey : 'FREE PLAY · ' + diffKey;
   ui.btnBack.style.display = 'block';
+  ui.btnHelp.style.display = 'block';
   ui.btnDiff.style.display = mode === 'free' ? 'block' : 'none';
+  ui.helpMenu.classList.remove('show');
   document.getElementById('scores').style.visibility = mode === 'match' ? 'visible' : 'hidden';
   G.hintT = 0;
   G.startCheck();
@@ -1762,6 +1834,10 @@ G.nextPossession = function () {
   if (G.mode === 'match' && (G.sy >= 7 || G.sd >= 7)) {
     G.phase = 'over';
     ui.end.style.display = 'flex';
+    ui.btnBack.style.display = 'none';
+    ui.btnHelp.style.display = 'none';
+    ui.btnDiff.style.display = 'none';
+    ui.helpMenu.classList.remove('show');
     const won = G.sy >= 7;
     ui.endTitle.textContent = won ? 'YOU WIN' : 'CLAMPED';
     ui.endTitle.className = 'disp ' + (won ? 'goldT' : 'heatT');
@@ -1888,6 +1964,14 @@ ui.btnMatch.addEventListener('click', () => { audioInit(); SND.blip(); G.startGa
 ui.btnRematch.addEventListener('click', () => { audioInit(); SND.blip(); G.startGame('match'); });
 ui.btnMenu2.addEventListener('click', () => { showMenu(); });
 ui.btnBack.addEventListener('click', () => { showMenu(); });
+ui.btnHelp.addEventListener('click', () => {
+  audioInit(); SND.tick();
+  ui.helpMenu.classList.toggle('show');
+});
+ui.btnHelpClose.addEventListener('click', () => {
+  SND.tick();
+  ui.helpMenu.classList.remove('show');
+});
 ui.btnDiff.addEventListener('click', () => {
   audioInit(); SND.tick();
   const order = ['EASY', 'MED', 'HARD'];
@@ -1897,7 +1981,9 @@ function showMenu() {
   G.phase = 'menu';
   ui.menu.style.display = 'flex'; ui.end.style.display = 'none';
   ui.hud.style.display = 'none'; ui.btnBack.style.display = 'none';
+  ui.btnHelp.style.display = 'none';
   ui.btnDiff.style.display = 'none';
+  ui.helpMenu.classList.remove('show');
   ui.checkPrompt.classList.remove('show');
   ui.banner.className = ''; ui.chips.classList.remove('show');
   Replay.on = false;
