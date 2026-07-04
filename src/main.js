@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import './styles.css';
 
 const container = document.querySelector('#game');
@@ -136,6 +138,8 @@ ball.castShadow = true;
 addBallSeams(ball);
 scene.add(ball);
 
+const stickModelPromise = new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/stick-man-rigged.glb`);
+
 class StickPlayer {
   constructor({
     role = 'offense',
@@ -169,6 +173,8 @@ class StickPlayer {
     this.jerseyMaterial = jerseyMaterial;
     this.shortsMaterial = shortsMaterial;
     this.shoeMaterial = shoeMaterial;
+    this.model = null;
+    this.bones = {};
     this.parts = {
       hips: sphere(0.045, shortsMaterial),
       chest: sphere(0.045, jerseyMaterial),
@@ -201,6 +207,54 @@ class StickPlayer {
     this.parts.chest.visible = false;
     this.group.add(this.parts.pivot);
     scene.add(this.group);
+    this.attachRiggedModel();
+  }
+
+  attachRiggedModel() {
+    stickModelPromise
+      .then((gltf) => {
+        const model = cloneSkeleton(gltf.scene);
+        const tint = this.role === 'offense' ? 0xf1dfc7 : 0x111719;
+        model.traverse((object) => {
+          if (object.isMesh || object.isSkinnedMesh) {
+            object.castShadow = true;
+            object.frustumCulled = false;
+            object.material = new THREE.MeshStandardMaterial({
+              color: tint,
+              roughness: this.role === 'offense' ? 0.48 : 0.56,
+              metalness: 0.02
+            });
+          }
+          if (object.isBone) this.bones[object.name] = object;
+        });
+        model.scale.setScalar(1.08);
+        model.position.z = -0.03;
+        this.model = model;
+        this.group.add(model);
+        this.setProceduralBodyVisible(false);
+      })
+      .catch((error) => {
+        console.warn('Could not load stick man model', error);
+      });
+  }
+
+  setProceduralBodyVisible(visible) {
+    [
+      'hips',
+      'chest',
+      'head',
+      'leftHand',
+      'rightHand',
+      'leftFoot',
+      'rightFoot',
+      'jersey',
+      'shorts'
+    ].forEach((key) => {
+      this.parts[key].visible = visible;
+    });
+    this.parts.limbs.forEach((limb) => {
+      limb.visible = visible;
+    });
   }
 
   setPosition(x, z) {
@@ -366,7 +420,90 @@ class StickPlayer {
     placeLimb(limbs[7], pose.knees.right, pose.feet.right, 0.03);
     limbs[8].visible = false;
     limbs[9].visible = false;
+    if (this.model) {
+      this.setProceduralBodyVisible(false);
+      this.updateRiggedModel(pose);
+    }
   }
+
+  updateRiggedModel(pose) {
+    const isOffense = this.role === 'offense';
+    const activeMove = isOffense ? game.move : null;
+    const moveP = activeMove ? clamp01(activeMove.t / activeMove.duration) : 0;
+    const moveEase = activeMove ? Math.sin(moveP * Math.PI) : 0;
+    const crossLoad = activeMove?.kind === 'cross' ? moveEase : 0;
+    const retreatLoad = activeMove?.kind === 'snatchback' || activeMove?.kind === 'stepback' ? moveEase : 0;
+    const gatherLoad = this.action === 'gather' ? 1 : 0;
+    const shotLoad = this.action === 'shot' ? 1 : 0;
+    const defenseLoad = this.action === 'defense' ? 1 : 0;
+    const side = activeMove?.dir?.x || this.ballHand;
+    const speed = clamp01(this.velocity.length() / 4.8);
+
+    this.model.position.y = Math.max(0, pose.feet.left.y - 0.035);
+    this.model.rotation.y = -this.facing + Math.PI / 2;
+
+    Object.values(this.bones).forEach((bone) => {
+      bone.rotation.set(0, 0, 0);
+    });
+
+    rotateBone(this.bones.Root_00, -0.18 * defenseLoad - 0.24 * crossLoad - 0.2 * gatherLoad, 0, side * 0.08 * crossLoad);
+    rotateBone(this.bones.Spine_01, -0.12 * defenseLoad - 0.22 * crossLoad - 0.16 * gatherLoad + 0.08 * shotLoad, 0, side * 0.1 * crossLoad);
+    rotateBone(this.bones.Spine2_03, 0.08 * shotLoad - 0.08 * crossLoad, side * 0.08 * crossLoad, side * 0.08 * crossLoad);
+    rotateBone(this.bones.Head_05, 0.08 * gatherLoad - 0.06 * shotLoad, 0, -side * 0.05 * crossLoad);
+
+    rotateBone(this.bones.LeftUpLeg_015, -0.34 * defenseLoad - 0.28 * crossLoad - 0.18 * gatherLoad + 0.1 * shotLoad, 0, 0.18 + crossLoad * 0.2);
+    rotateBone(this.bones.RightUpLeg_018, -0.34 * defenseLoad - 0.28 * crossLoad - 0.18 * gatherLoad + 0.1 * shotLoad, 0, -0.18 - crossLoad * 0.2);
+    rotateBone(this.bones.LeftLeg_016, 0.44 * defenseLoad + 0.34 * crossLoad + 0.28 * gatherLoad - 0.08 * shotLoad, 0, 0);
+    rotateBone(this.bones.RightLeg_019, 0.44 * defenseLoad + 0.34 * crossLoad + 0.28 * gatherLoad - 0.08 * shotLoad, 0, 0);
+    rotateBone(this.bones.LeftFoot_017, -0.08 * speed, 0, 0.08 * crossLoad);
+    rotateBone(this.bones.RightFoot_020, -0.08 * speed, 0, -0.08 * crossLoad);
+
+    const leftIsBall = this.ballHand < 0;
+    poseArm(this.bones.LeftArm_08, this.bones.LeftForeArm_09, leftIsBall, -1, {
+      crossLoad,
+      retreatLoad,
+      gatherLoad,
+      shotLoad,
+      defenseLoad,
+      side
+    });
+    poseArm(this.bones.RightArm_012, this.bones.RightForeArm_013, !leftIsBall, 1, {
+      crossLoad,
+      retreatLoad,
+      gatherLoad,
+      shotLoad,
+      defenseLoad,
+      side
+    });
+  }
+}
+
+function rotateBone(bone, x = 0, y = 0, z = 0) {
+  if (!bone) return;
+  bone.rotation.x += x;
+  bone.rotation.y += y;
+  bone.rotation.z += z;
+}
+
+function poseArm(upper, lower, isBallArm, armSide, pose) {
+  const crossReach = pose.crossLoad * (isBallArm ? 1 : 0.55);
+  const guardReach = pose.defenseLoad * 0.75;
+  const gather = pose.gatherLoad;
+  const shot = pose.shotLoad;
+  const retreat = pose.retreatLoad;
+
+  rotateBone(
+    upper,
+    -0.36 * guardReach - 0.62 * crossReach - 0.78 * gather - 1.22 * shot - 0.34 * retreat,
+    armSide * (0.2 + 0.24 * guardReach + 0.18 * crossReach),
+    armSide * (0.2 * guardReach + 0.12 * crossReach - 0.38 * shot)
+  );
+  rotateBone(
+    lower,
+    -0.48 * guardReach - 0.74 * crossReach - 1.06 * gather - 0.34 * shot - 0.42 * retreat,
+    armSide * 0.08 * crossReach,
+    armSide * (0.12 * guardReach - 0.2 * shot)
+  );
 }
 
 const offense = new StickPlayer({
