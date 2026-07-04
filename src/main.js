@@ -573,7 +573,7 @@ const game = {
   chainWindow: 0,
   move: null,
   defenderState: 'Neutral',
-  defenderDelay: 0.18,
+  defenderDelay: 0.1,
   defenderSamples: [],
   defenderReactTimer: 0,
   defenderShade: 0,
@@ -686,6 +686,7 @@ function update(dt) {
 
   updateOffense(dt);
   updateDefender(dt);
+  resolvePlayerContact(dt);
   updateAdvantage(dt);
   updateGather(dt);
   updateShot(dt);
@@ -786,16 +787,16 @@ function updateOffense(dt) {
   const blend = 1 - Math.exp(-dt * (game.state === 'contact' ? 7 : 10));
   offense.velocity.lerp(desired, blend);
   offense.root.addScaledVector(offense.velocity, dt);
-  if (!game.move && !earnedLane) {
+  if (!earnedLane) {
     const afterGap = flatDistance(offense.root, defense.root);
-    const overlap = 0.64 - afterGap;
+    const overlap = 0.7 - afterGap;
     if (overlap > 0) {
       const push = tmpB.copy(offense.root).sub(defense.root);
       if (push.lengthSq() < 0.001) push.copy(position.toRim).multiplyScalar(-1);
       push.y = 0;
       push.normalize();
-      offense.root.addScaledVector(push, overlap * 0.78);
-      offense.velocity.addScaledVector(push, overlap * 1.8).multiplyScalar(0.56);
+      offense.root.addScaledVector(push, overlap * 0.95);
+      offense.velocity.addScaledVector(push, overlap * 2.2).multiplyScalar(0.38);
       game.defenderCrowd = clamp01(game.defenderCrowd + overlap * 0.35);
     }
   }
@@ -899,7 +900,7 @@ function updateDefender(dt) {
     const ballSide = delayed?.hand || offense.ballHand;
     const courtSide = Math.sign(offense.root.x);
     game.defenderShade = clamp(ballSide * 0.65 + courtSide * 0.25, -1, 1);
-    game.defenderReactTimer = 0.22 + Math.random() * 0.1;
+    game.defenderReactTimer = 0.12 + Math.random() * 0.06;
   }
 
   game.defenderWrongWay = Math.max(0, game.defenderWrongWay - dt);
@@ -910,19 +911,27 @@ function updateDefender(dt) {
     game.defenderContest = Math.max(game.defenderContest, game.state === 'shot' ? 0.72 : 0.52);
   }
 
-  const samplePos = delayed?.pos || offense.root;
-  const sampleVel = delayed?.vel || offense.velocity;
+  const samplePos = (delayed?.pos || offense.root).clone();
+  const sampleVel = (delayed?.vel || offense.velocity).clone();
+  const emergencyRead =
+    game.defenderWrongWay <= 0 &&
+    game.defenderBite <= 0 &&
+    (liveSep < 1.35 || offense.velocity.length() > 2.15 || Math.abs(offense.root.x) > 2.25);
+  if (emergencyRead) {
+    samplePos.lerp(offense.root, 0.72);
+    sampleVel.lerp(offense.velocity, 0.68);
+  }
   const toRim = tmpA.copy(rimFloor).sub(samplePos).normalize();
   const aiPressure = game.mode === 'score' ? 1 : 0.82;
-  const guardGap = game.state === 'attack' ? 0.56 : game.state === 'retreat' ? 1.04 : 0.78;
+  const guardGap = game.state === 'attack' ? 0.44 : game.state === 'retreat' ? 0.98 : 0.68;
   const ideal = tmpB.copy(samplePos).addScaledVector(toRim, guardGap);
   const sideWall = smoothstep(2.15, 3.45, Math.abs(samplePos.x));
   const cutOffSide = Math.sign(samplePos.x || game.defenderShade || 1);
   ideal.x += game.defenderShade * THREE.MathUtils.lerp(0.12, 0.2, aiPressure);
   ideal.x += cutOffSide * sideWall * 0.48;
-  ideal.addScaledVector(sampleVel, game.state === 'attack' ? 0.24 : 0.13);
+  ideal.addScaledVector(sampleVel, game.state === 'attack' ? 0.34 : 0.2);
 
-  let maxSpeed = THREE.MathUtils.lerp(4.15, 5.25, aiPressure);
+  let maxSpeed = THREE.MathUtils.lerp(4.9, 6.25, aiPressure);
   game.defenderState = 'Neutral';
   if (liveSep < 0.72) {
     game.defenderCrowd = clamp01(game.defenderCrowd + dt * 1.4);
@@ -934,20 +943,20 @@ function updateDefender(dt) {
   if (game.defenderWrongWay > 0) {
     ideal.x -= Math.sign(offense.root.x - defense.root.x || game.defenderShade || 1) * 0.85;
     ideal.z -= 0.22;
-    maxSpeed = 2.25;
+    maxSpeed = 2.15;
     game.defenderState = 'Beat';
   }
 
   if (game.defenderBite > 0) {
     ideal.z -= 0.42;
-    maxSpeed = 1.65;
+    maxSpeed = 1.55;
     game.defenderState = 'Bite';
     defense.bite = Math.max(defense.bite, game.defenderBite);
   }
 
   if (game.defenderContest > 0) {
     ideal.copy(offense.root).addScaledVector(toRim, 0.55);
-    maxSpeed = 5.35;
+    maxSpeed = 6.05;
     game.defenderState = 'Contest';
     defense.contest = Math.max(defense.contest, game.defenderContest);
   } else if (Math.abs(game.defenderShade) > 0.42) {
@@ -959,10 +968,10 @@ function updateDefender(dt) {
   if (distance > 0.001) {
     desired.normalize().multiplyScalar(Math.min(maxSpeed, distance / Math.max(dt, 0.001)));
   }
-  defense.velocity.lerp(desired, 1 - Math.exp(-dt * 7.8));
+  defense.velocity.lerp(desired, 1 - Math.exp(-dt * (emergencyRead ? 13 : 9.2)));
 
   if (sampleVel.length() > 3.2 && game.defenderWrongWay <= 0) {
-    defense.velocity.addScaledVector(sampleVel, 0.09);
+    defense.velocity.addScaledVector(sampleVel, emergencyRead ? 0.16 : 0.1);
   }
 
   defense.root.addScaledVector(defense.velocity, dt);
@@ -1011,6 +1020,43 @@ function updatePlayerDefense(dt) {
   defense.ballHand = offense.ballHand;
   defense.beat = Math.max(defense.beat, game.defenderWrongWay);
   defense.contest = Math.max(defense.contest, game.defenderContest);
+}
+
+function resolvePlayerContact(dt) {
+  if (game.state === 'shot' || game.state === 'finish') return;
+  const gap = flatDistance(offense.root, defense.root);
+  const earnedLane = game.defenderWrongWay > 0.3;
+  const minGap = earnedLane ? 0.54 : 0.76;
+  const overlap = minGap - gap;
+  if (overlap <= 0) return;
+
+  const push = tmpA.copy(offense.root).sub(defense.root);
+  if (push.lengthSq() < 0.001) {
+    push.copy(rimFloor).sub(offense.root).multiplyScalar(-1);
+  }
+  push.y = 0;
+  push.normalize();
+
+  const position = defenderPositioning();
+  const laneCutoff = position.between > 0.28 && position.laneGap < 0.9 && !earnedLane;
+  const offenseShare = laneCutoff ? 0.92 : earnedLane ? 0.62 : 0.82;
+  offense.root.addScaledVector(push, overlap * offenseShare);
+  defense.root.addScaledVector(push, -overlap * (1 - offenseShare));
+
+  const rimward = offense.velocity.dot(position.toRim);
+  if (rimward > 0 && laneCutoff) {
+    offense.velocity.addScaledVector(position.toRim, -rimward * 0.82);
+  }
+  offense.velocity.addScaledVector(push, overlap * 3.2).multiplyScalar(laneCutoff ? 0.36 : 0.58);
+  defense.velocity.addScaledVector(push, -overlap * 1.1);
+
+  clampPlayer(offense.root);
+  clampPlayer(defense.root);
+  game.defenderCrowd = clamp01(game.defenderCrowd + overlap * 0.8);
+  if (laneCutoff && !game.move) {
+    setState('contact');
+    offense.pivotSide = offense.ballHand;
+  }
 }
 
 function handleDefenseRelease() {
