@@ -379,16 +379,25 @@ class StickPlayer {
       plant.side = null;
     }
 
+    const slide = clamp01(speed / 4.6);
+    const groundedBlend = 1 - Math.exp(-dt * THREE.MathUtils.lerp(6.5, 13, slide));
+    const plantedBlend = 1 - Math.exp(-dt * THREE.MathUtils.lerp(2.6, 6.2, slide));
+    if (plant.side !== 'left') {
+      plant.left.lerp(desiredLeft, speed < 0.12 ? groundedBlend : plantedBlend);
+    }
+    if (plant.side !== 'right') {
+      plant.right.lerp(desiredRight, speed < 0.12 ? groundedBlend : plantedBlend);
+    }
+
     const leftGap = flatDistance(plant.left, desiredLeft);
     const rightGap = flatDistance(plant.right, desiredRight);
-    const stepThreshold = this.action === 'defense' || this.action === 'bite' || this.action === 'beat'
-      ? 0.34
-      : THREE.MathUtils.lerp(0.26, 0.42, clamp01(speed / 4.4));
+    const defensivePose = this.action === 'defense' || this.action === 'bite' || this.action === 'beat';
+    const stepThreshold = defensivePose ? 0.26 : THREE.MathUtils.lerp(0.2, 0.34, slide);
 
     if (!plant.side && (leftGap > stepThreshold || rightGap > stepThreshold)) {
       plant.side = leftGap > rightGap ? 'left' : 'right';
       plant.t = 0;
-      plant.duration = THREE.MathUtils.lerp(0.14, 0.22, clamp01(speed / 4.8));
+      plant.duration = THREE.MathUtils.lerp(0.1, 0.17, slide);
       plant.from.copy(plant[plant.side]);
       plant.to.copy(plant.side === 'left' ? desiredLeft : desiredRight);
     }
@@ -398,23 +407,19 @@ class StickPlayer {
       const p = clamp01(plant.t / plant.duration);
       const footPos = plant[plant.side];
       footPos.lerpVectors(plant.from, plant.to, easeInOut(p));
-      footPos.y = THREE.MathUtils.lerp(plant.from.y, plant.to.y, p) + Math.sin(p * Math.PI) * 0.08;
+      footPos.y = THREE.MathUtils.lerp(plant.from.y, plant.to.y, p) + Math.sin(p * Math.PI) * 0.052;
       if (p >= 1) {
         footPos.copy(plant.to);
         plant.side = null;
       }
     }
 
-    if (speed < 0.08 && !plant.side) {
-      const settle = 1 - Math.exp(-dt * 5);
-      plant.left.lerp(desiredLeft, settle);
-      plant.right.lerp(desiredRight, settle);
-    }
-
     pose.feet.left.copy(plant.left).sub(this.root);
     pose.feet.right.copy(plant.right).sub(this.root);
     pose.feet.left.y = Math.max(pose.feet.left.y, 0.035);
     pose.feet.right.y = Math.max(pose.feet.right.y, 0.035);
+    pose.knees.left.copy(pose.hipsSide.left).lerp(pose.feet.left, 0.5).add(new THREE.Vector3(-0.06, -0.05, 0.05));
+    pose.knees.right.copy(pose.hipsSide.right).lerp(pose.feet.right, 0.5).add(new THREE.Vector3(0.06, -0.05, -0.05));
   }
 
   update(dt) {
