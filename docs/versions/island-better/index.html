@@ -921,7 +921,8 @@ stage.addEventListener('pointermove', e => {
 function pointerEnd(e) {
   if (!Input.active || e.pointerId !== Input.id) return;
   Input.active = false;
-  Input.released = { quick: (G.t - Input.downT) < 0.14, check: Input.checkPress };
+  const quick = (G.t - Input.downT) < 0.14;
+  Input.released = { quick, check: Input.checkPress && quick };
   Input.checkPress = false;
   Input.mag = 0; Input.mwx = 0; Input.mwz = 0;
 }
