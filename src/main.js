@@ -188,20 +188,20 @@ class StickPlayer {
       rightHand: sphere(0.052, limbMaterial),
       leftFoot: foot(shoeMaterial),
       rightFoot: foot(shoeMaterial),
-      jersey: new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.24, 8, 18), jerseyMaterial),
-      shorts: new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.06, 6, 16), shortsMaterial),
+      jersey: new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.24, 8, 18), jerseyMaterial),
+      shorts: new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.06, 6, 16), shortsMaterial),
       shoulderBridge: new THREE.Mesh(new THREE.CapsuleGeometry(0.034, 0.9, 5, 12), jerseyMaterial),
       hipBridge: new THREE.Mesh(new THREE.CapsuleGeometry(0.034, 0.9, 5, 12), shortsMaterial),
       pivot: ring(accentMaterial),
       ballHand: sphere(0.045, accentMaterial),
       joints: {
         neck: sphere(0.052, limbMaterial),
-        leftShoulder: sphere(0.082, limbMaterial),
-        rightShoulder: sphere(0.082, limbMaterial),
+        leftShoulder: sphere(0.066, limbMaterial),
+        rightShoulder: sphere(0.066, limbMaterial),
         leftElbow: sphere(0.058, limbMaterial),
         rightElbow: sphere(0.058, limbMaterial),
-        leftHip: sphere(0.07, shortsMaterial),
-        rightHip: sphere(0.07, shortsMaterial),
+        leftHip: sphere(0.056, shortsMaterial),
+        rightHip: sphere(0.056, shortsMaterial),
         leftKnee: sphere(0.062, limbMaterial),
         rightKnee: sphere(0.062, limbMaterial),
         leftAnkle: sphere(0.05, limbMaterial),
@@ -283,10 +283,10 @@ class StickPlayer {
     const hips = new THREE.Vector3(leanX * 0.34, hipY, leanZ * 0.3);
     const chest = new THREE.Vector3(leanX, shoulderY, leanZ);
     const head = new THREE.Vector3(leanX * 1.05, 1.82 + low + rise + jump, leanZ * 1.05);
-    const leftHip = new THREE.Vector3(-0.18 + leanX * 0.22, hipY - 0.04, leanZ * 0.16);
-    const rightHip = new THREE.Vector3(0.18 + leanX * 0.22, hipY - 0.04, leanZ * 0.16);
-    const leftShoulder = new THREE.Vector3(-0.3 + leanX, shoulderY, leanZ);
-    const rightShoulder = new THREE.Vector3(0.3 + leanX, shoulderY, leanZ);
+    const leftHip = new THREE.Vector3(-0.145 + leanX * 0.22, hipY - 0.04, leanZ * 0.16);
+    const rightHip = new THREE.Vector3(0.145 + leanX * 0.22, hipY - 0.04, leanZ * 0.16);
+    const leftShoulder = new THREE.Vector3(-0.245 + leanX, shoulderY, leanZ);
+    const rightShoulder = new THREE.Vector3(0.245 + leanX, shoulderY, leanZ);
     const leftFoot = new THREE.Vector3(-stance - stride * cross, footY, stride * forward);
     const rightFoot = new THREE.Vector3(stance + stride * cross, footY, -stride * forward);
     if (crossLoad > 0) {
@@ -455,14 +455,14 @@ class StickPlayer {
       this.parts.jersey,
       tmpA.copy(pose.hips).add(new THREE.Vector3(0, 0.04, 0)),
       tmpC.copy(pose.chest).add(new THREE.Vector3(0, -0.09, 0)),
-      0.46,
-      0.2
+      0.36,
+      0.17
     );
     this.parts.shorts.position.copy(pose.hips).add(new THREE.Vector3(0, -0.07, 0.02));
-    this.parts.shorts.scale.set(0.48, 0.25, 0.26);
+    this.parts.shorts.scale.set(0.38, 0.23, 0.22);
     this.parts.shorts.quaternion.identity();
-    placeLimb(this.parts.shoulderBridge, pose.shoulders.left, pose.shoulders.right, 0.036);
-    placeLimb(this.parts.hipBridge, pose.hipsSide.left, pose.hipsSide.right, 0.046);
+    placeLimb(this.parts.shoulderBridge, pose.shoulders.left, pose.shoulders.right, 0.028);
+    placeLimb(this.parts.hipBridge, pose.hipsSide.left, pose.hipsSide.right, 0.036);
     this.parts.joints.neck.position.copy(tmpA.copy(pose.chest).lerp(pose.head, 0.34));
     this.parts.joints.leftShoulder.position.copy(pose.shoulders.left);
     this.parts.joints.rightShoulder.position.copy(pose.shoulders.right);
