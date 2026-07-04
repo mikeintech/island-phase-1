@@ -172,20 +172,20 @@ class StickPlayer {
     this.parts = {
       hips: sphere(0.045, shortsMaterial),
       chest: sphere(0.045, jerseyMaterial),
-      head: sphere(0.145, headMaterial),
-      leftHand: sphere(0.07, limbMaterial),
-      rightHand: sphere(0.07, limbMaterial),
+      head: sphere(0.115, headMaterial),
+      leftHand: sphere(0.052, limbMaterial),
+      rightHand: sphere(0.052, limbMaterial),
       leftFoot: foot(shoeMaterial),
       rightFoot: foot(shoeMaterial),
-      jersey: new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.72, 10, 22), jerseyMaterial),
-      shorts: new THREE.Mesh(new THREE.CapsuleGeometry(0.21, 0.2, 8, 18), shortsMaterial),
+      jersey: new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 1, 18), jerseyMaterial),
+      shorts: new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 1, 16), shortsMaterial),
       pivot: ring(accentMaterial),
       ballHand: sphere(0.045, accentMaterial),
       limbs: []
     };
 
     for (let i = 0; i < 10; i += 1) {
-      const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.88, 6, 14), limbMaterial);
+      const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.034, 0.9, 5, 10), limbMaterial);
       limb.castShadow = true;
       this.parts.limbs.push(limb);
       this.group.add(limb);
@@ -338,7 +338,7 @@ class StickPlayer {
     this.parts.hips.position.copy(pose.hips);
     this.parts.chest.position.copy(pose.chest);
     this.parts.head.position.copy(pose.head);
-    this.parts.head.scale.set(0.9, 1.02, 0.86);
+    this.parts.head.scale.set(0.82, 1.12, 0.78);
     this.parts.leftHand.position.copy(pose.hands.left);
     this.parts.rightHand.position.copy(pose.hands.right);
     this.parts.leftFoot.position.copy(pose.feet.left);
@@ -348,11 +348,11 @@ class StickPlayer {
       this.parts.jersey,
       tmpA.copy(pose.hips).add(new THREE.Vector3(0, 0.04, 0)),
       tmpC.copy(pose.chest).add(new THREE.Vector3(0, -0.09, 0)),
-      1.06,
-      0.92
+      0.46,
+      0.2
     );
     this.parts.shorts.position.copy(pose.hips).add(new THREE.Vector3(0, -0.14, 0.02));
-    this.parts.shorts.scale.set(0.98, 0.44, 0.82);
+    this.parts.shorts.scale.set(0.48, 0.23, 0.24);
     this.parts.shorts.quaternion.identity();
     this.parts.pivot.visible = game.state === 'stop' || game.state === 'contact' || game.state === 'shotFake';
     this.parts.pivot.position.copy(this.pivotSide > 0 ? pose.feet.right : pose.feet.left);
@@ -360,13 +360,13 @@ class StickPlayer {
 
     const limbs = this.parts.limbs;
     limbs[0].visible = false;
-    placeLimb(limbs[1], tmpA.copy(pose.chest).add(new THREE.Vector3(0, 0.04, 0)), pose.head, 0.034);
-    placeLimb(limbs[2], pose.shoulders.left, pose.hands.left, 0.04);
-    placeLimb(limbs[3], pose.shoulders.right, pose.hands.right, 0.04);
-    placeLimb(limbs[4], pose.hipsSide.left, pose.knees.left, 0.047);
-    placeLimb(limbs[5], pose.knees.left, pose.feet.left, 0.045);
-    placeLimb(limbs[6], pose.hipsSide.right, pose.knees.right, 0.047);
-    placeLimb(limbs[7], pose.knees.right, pose.feet.right, 0.045);
+    placeLimb(limbs[1], tmpA.copy(pose.chest).add(new THREE.Vector3(0, 0.03, 0)), pose.head, 0.025);
+    placeLimb(limbs[2], pose.shoulders.left, pose.hands.left, 0.026);
+    placeLimb(limbs[3], pose.shoulders.right, pose.hands.right, 0.026);
+    placeLimb(limbs[4], pose.hipsSide.left, pose.knees.left, 0.031);
+    placeLimb(limbs[5], pose.knees.left, pose.feet.left, 0.03);
+    placeLimb(limbs[6], pose.hipsSide.right, pose.knees.right, 0.031);
+    placeLimb(limbs[7], pose.knees.right, pose.feet.right, 0.03);
     limbs[8].visible = false;
     limbs[9].visible = false;
   }
