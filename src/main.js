@@ -16,6 +16,7 @@ const labReadout = document.querySelector('#labReadout');
 const rim = new THREE.Vector3(0, 3.05, -5.85);
 const rimFloor = new THREE.Vector3(0, 0, -5.85);
 const courtBounds = { minX: -3.75, maxX: 3.75, minZ: -5.35, maxZ: 3.35 };
+const netLines = [];
 const tmpA = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
 const tmpC = new THREE.Vector3();
@@ -162,6 +163,16 @@ class StickPlayer {
     this.bite = 0;
     this.beat = 0;
     this.pivotSide = -1;
+    this.footPlant = {
+      ready: false,
+      left: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      side: null,
+      t: 0,
+      duration: 0.18,
+      from: new THREE.Vector3(),
+      to: new THREE.Vector3()
+    };
     this.material = limbMaterial;
     this.jointMaterial = jointMaterial;
     this.headMaterial = headMaterial;
@@ -225,6 +236,7 @@ class StickPlayer {
   setPosition(x, z) {
     this.root.set(x, 0, z);
     this.group.position.copy(this.root);
+    this.footPlant.ready = false;
   }
 
   handWorld(side) {
@@ -239,27 +251,30 @@ class StickPlayer {
     const moveKind = activeMove?.kind || '';
     const moveP = activeMove ? clamp01(activeMove.t / activeMove.duration) : 0;
     const moveEase = Math.sin(moveP * Math.PI);
+    const defensivePose = this.action === 'defense' || this.action === 'bite' || this.action === 'beat';
     const crossLoad = moveKind === 'cross' ? moveEase : 0;
+    const inoutLoad = moveKind === 'inout' ? moveEase : 0;
     const retreatLoad = moveKind === 'snatchback' || moveKind === 'stepback' ? moveEase : 0;
-    const shotP = isOffense && game.shot ? clamp01((game.shot.t - 0.22) / 0.34) : 0;
+    const shotP = isOffense && game.shot ? clamp01(game.shot.t / 0.38) : 0;
     const stride = Math.sin(this.phase) * 0.16 * Math.min(speed / 3.2, 1);
     const cross = Math.cos(this.facing);
     const forward = Math.sin(this.facing);
     const stance =
-      (this.action === 'defense' ? 0.37 : this.action === 'shot' ? 0.22 : 0.26) +
+      (defensivePose ? 0.37 : this.action === 'shot' ? 0.22 : 0.26) +
       crossLoad * 0.18 +
       retreatLoad * 0.08 +
       (this.action === 'gather' ? 0.08 : 0);
     const low =
-      (this.action === 'defense' ? -0.08 : 0) +
+      (defensivePose ? -0.08 : 0) +
+      (this.action === 'bite' ? 0.05 : 0) +
       (this.action === 'gather' ? -0.13 : 0) -
       crossLoad * 0.12 -
       retreatLoad * 0.05;
     const rise = this.action === 'shot' ? 0.22 + Math.sin(shotP * Math.PI) * 0.12 : 0;
     const jump = this.contest > 0 ? 0.16 * Math.sin(this.contest * Math.PI) : 0;
     const moveLean = activeMove?.dir?.x || 0;
-    const leanX = this.lean.x * 0.18 + this.shade * 0.08 + crossLoad * moveLean * 0.18;
-    const leanZ = this.lean.y * 0.18 - this.beat * 0.05 + retreatLoad * 0.12;
+    const leanX = this.lean.x * 0.18 + this.shade * 0.08 + crossLoad * moveLean * 0.18 - this.beat * this.shade * 0.1;
+    const leanZ = this.lean.y * 0.18 - this.beat * 0.1 + retreatLoad * 0.12 + this.bite * 0.08;
     const hipY = 0.86 + low + rise + jump;
     const shoulderY = 1.48 + low + rise + jump;
     const handLift = this.action === 'shot' ? 0.98 : this.contest > 0 ? 0.72 : 0;
@@ -299,16 +314,18 @@ class StickPlayer {
       0.17 + leanZ * 0.36
     );
     const offHand = new THREE.Vector3(offSide * 0.28, 1.06 + handLift * 0.35, 0.15);
-    if (this.action === 'defense') {
-      activeHand.set(dribbleSide * 0.54, 0.98 + handLift * 0.25, 0.08);
-      offHand.set(offSide * 0.54, 0.98 + handLift * 0.25, 0.08);
+    if (defensivePose) {
+      const wrong = this.action === 'beat' ? this.beat : this.bite;
+      activeHand.set(dribbleSide * (0.54 + wrong * 0.08), 0.98 + handLift * 0.25 - wrong * 0.06, 0.08 - wrong * 0.08);
+      offHand.set(offSide * (0.54 - wrong * 0.06), 0.98 + handLift * 0.25 + wrong * 0.08, 0.08 + wrong * 0.04);
     }
-    if (crossLoad > 0) {
+    if (crossLoad > 0 || inoutLoad > 0) {
       const from = activeMove.fromHand ?? -dribbleSide;
       const to = activeMove.toHand ?? dribbleSide;
+      const fake = inoutLoad > 0 ? Math.sin(moveP * Math.PI) * activeMove.dir.x * 0.22 : 0;
       const side = THREE.MathUtils.lerp(from, to, easeInOut(moveP));
-      activeHand.set(side * (0.5 - crossLoad * 0.08), 0.43 + crossLoad * 0.1, 0.18);
-      offHand.set(-side * 0.22, 0.94 - crossLoad * 0.06, 0.18);
+      activeHand.set(side * (0.5 - crossLoad * 0.08) + fake, 0.43 + (crossLoad + inoutLoad) * 0.1, 0.18);
+      offHand.set(-side * 0.22, 0.94 - (crossLoad + inoutLoad) * 0.06, 0.18);
     } else if (retreatLoad > 0) {
       activeHand.set(dribbleSide * 0.42, 0.62 + retreatLoad * 0.12, 0.22 + retreatLoad * 0.08);
       offHand.set(offSide * 0.28, 1.0, 0.15);
@@ -345,6 +362,61 @@ class StickPlayer {
     };
   }
 
+  applyFootPlants(pose, dt, speed) {
+    const airborne = this.action === 'shot' || this.contest > 0.08;
+    const plant = this.footPlant;
+    if (airborne) {
+      plant.ready = false;
+      return;
+    }
+
+    const desiredLeft = pose.feet.left.clone().add(this.root);
+    const desiredRight = pose.feet.right.clone().add(this.root);
+    if (!plant.ready) {
+      plant.left.copy(desiredLeft);
+      plant.right.copy(desiredRight);
+      plant.ready = true;
+      plant.side = null;
+    }
+
+    const leftGap = flatDistance(plant.left, desiredLeft);
+    const rightGap = flatDistance(plant.right, desiredRight);
+    const stepThreshold = this.action === 'defense' || this.action === 'bite' || this.action === 'beat'
+      ? 0.34
+      : THREE.MathUtils.lerp(0.26, 0.42, clamp01(speed / 4.4));
+
+    if (!plant.side && (leftGap > stepThreshold || rightGap > stepThreshold)) {
+      plant.side = leftGap > rightGap ? 'left' : 'right';
+      plant.t = 0;
+      plant.duration = THREE.MathUtils.lerp(0.14, 0.22, clamp01(speed / 4.8));
+      plant.from.copy(plant[plant.side]);
+      plant.to.copy(plant.side === 'left' ? desiredLeft : desiredRight);
+    }
+
+    if (plant.side) {
+      plant.t += dt;
+      const p = clamp01(plant.t / plant.duration);
+      const footPos = plant[plant.side];
+      footPos.lerpVectors(plant.from, plant.to, easeInOut(p));
+      footPos.y = THREE.MathUtils.lerp(plant.from.y, plant.to.y, p) + Math.sin(p * Math.PI) * 0.08;
+      if (p >= 1) {
+        footPos.copy(plant.to);
+        plant.side = null;
+      }
+    }
+
+    if (speed < 0.08 && !plant.side) {
+      const settle = 1 - Math.exp(-dt * 5);
+      plant.left.lerp(desiredLeft, settle);
+      plant.right.lerp(desiredRight, settle);
+    }
+
+    pose.feet.left.copy(plant.left).sub(this.root);
+    pose.feet.right.copy(plant.right).sub(this.root);
+    pose.feet.left.y = Math.max(pose.feet.left.y, 0.035);
+    pose.feet.right.y = Math.max(pose.feet.right.y, 0.035);
+  }
+
   update(dt) {
     const speed = this.velocity.length();
     this.phase += dt * (5.2 + speed * 1.2);
@@ -364,6 +436,7 @@ class StickPlayer {
 
     this.group.position.copy(this.root);
     const pose = this.getPose();
+    this.applyFootPlants(pose, dt, speed);
     this.parts.hips.position.copy(pose.hips);
     this.parts.chest.position.copy(pose.chest);
     this.parts.head.position.copy(pose.head);
@@ -471,7 +544,9 @@ const game = {
   defenderBite: 0,
   defenderContest: 0,
   defenderCrowd: 0,
+  gather: null,
   shot: null,
+  netPinch: 0,
   replay: null,
   feedback: null,
   lab: false
@@ -525,7 +600,7 @@ function update(dt) {
   game.stateTime += dt;
   game.lastMoveTime += dt;
 
-  if (game.mode === 'score' && !['shot', 'finish', 'check'].includes(game.state)) {
+  if (game.mode === 'score' && !['gather', 'shot', 'finish', 'check'].includes(game.state)) {
     game.shotClock = Math.max(0, game.shotClock - dt);
     if (game.shotClock <= 0) {
       resolveDeadPossession('Clock', 'late', true);
@@ -540,7 +615,9 @@ function update(dt) {
   updateOffense(dt);
   updateDefender(dt);
   updateAdvantage(dt);
+  updateGather(dt);
   updateShot(dt);
+  updateNet(dt);
   updateResetTimer(dt);
   offense.update(dt);
   defense.update(dt);
@@ -551,7 +628,7 @@ function update(dt) {
 }
 
 function updateOffense(dt) {
-  if (game.state === 'shot' || game.state === 'finish') {
+  if (game.state === 'gather' || game.state === 'shot' || game.state === 'finish') {
     offense.velocity.multiplyScalar(Math.exp(-dt * 8));
     return;
   }
@@ -614,6 +691,10 @@ function applyMove(dt, desired) {
     desired.x += move.dir.x * (3.7 * ease + 0.8);
     desired.z += move.forward * 1.15 * ease;
     game.balance = clamp01(game.balance - dt * 0.04 + (p > 0.45 ? dt * 0.08 : 0));
+  } else if (move.kind === 'inout') {
+    desired.x += move.dir.x * (1.25 * ease - 0.38 * p);
+    desired.z -= 1.55 * ease;
+    game.balance = clamp01(game.balance + dt * 0.1);
   } else if (move.kind === 'snatchback') {
     desired.z += 3.6 * ease + 0.75;
     desired.x += move.dir.x * 0.9 * ease;
@@ -732,7 +813,8 @@ function updateDefender(dt) {
   defense.root.addScaledVector(defense.velocity, dt);
   clampPlayer(defense.root);
   defense.shade = game.defenderShade;
-  defense.action = game.defenderContest > 0 ? 'shot' : 'defense';
+  defense.action =
+    game.defenderContest > 0 ? 'shot' : game.defenderWrongWay > 0 ? 'beat' : game.defenderBite > 0 ? 'bite' : 'defense';
   defense.ballHand = offense.ballHand;
   defense.beat = Math.max(defense.beat, game.defenderWrongWay);
 }
@@ -753,34 +835,43 @@ function updateAdvantage(dt) {
   if (dt > 0) game.fatigue = clamp01(game.fatigue + dt * 0.006);
 }
 
+function updateGather(dt) {
+  if (!game.gather) return;
+  const gather = game.gather;
+  gather.t += dt;
+  offense.action = 'gather';
+  offense.velocity.multiplyScalar(Math.exp(-dt * 9));
+
+  const p = easeInOut(clamp01(gather.t / gather.duration));
+  const gatherPocket = offense.group.localToWorld(
+    new THREE.Vector3(
+      offense.ballHand * THREE.MathUtils.lerp(0.34, 0.09, p),
+      THREE.MathUtils.lerp(0.64, 2.18, p),
+      THREE.MathUtils.lerp(0.14, -0.02, p)
+    )
+  );
+  ball.position.copy(gatherPocket);
+
+  if (gather.t >= gather.duration) {
+    const lockedMetrics = gather.metrics;
+    game.gather = null;
+    startShot(lockedMetrics);
+  }
+}
+
 function updateShot(dt) {
   if (!game.shot) return;
   const shot = game.shot;
   shot.t += dt;
-  const releaseDelay = 0.22;
-
-  if (shot.t < releaseDelay) {
-    offense.action = 'gather';
-    const p = easeInOut(clamp01(shot.t / releaseDelay));
-    const gatherPocket = offense.group.localToWorld(
-      new THREE.Vector3(
-        offense.ballHand * THREE.MathUtils.lerp(0.34, 0.1, p),
-        THREE.MathUtils.lerp(0.64, 1.72, p),
-        THREE.MathUtils.lerp(0.14, 0.0, p)
-      )
-    );
-    ball.position.copy(gatherPocket);
-    return;
-  }
-
   offense.action = 'shot';
-  const p = clamp01((shot.t - releaseDelay) / shot.flight);
+  const p = clamp01(shot.t / shot.flight);
   const arc = Math.sin(Math.PI * p) * shot.arc;
   ball.position.lerpVectors(shot.start, shot.end, easeInOut(p));
   ball.position.y += arc;
 
   if (!shot.audioPlayed && p >= shot.impactAt) {
     shot.audioPlayed = true;
+    game.netPinch = shot.made ? 1 : 0;
     audio.playResult(shot.outcome);
     showFeedback(shot);
     applyScore(shot);
@@ -793,11 +884,28 @@ function updateShot(dt) {
     }
   }
 
-  if (shot.t > releaseDelay + shot.flight + shot.hold) {
+  if (shot.t > shot.flight + shot.hold) {
     game.shot = null;
     setState('finish');
     game.resetTimer = shot.outcome === 'cookedSwish' ? 1.35 : 0.72;
   }
+}
+
+function updateNet(dt) {
+  game.netPinch = Math.max(0, game.netPinch - dt * 2.8);
+  const snap = Math.sin(game.netPinch * Math.PI);
+  netLines.forEach((strand) => {
+    const a = strand.userData.angle;
+    const top = new THREE.Vector3(Math.cos(a) * 0.22, 3.02, rim.z + Math.sin(a) * 0.22);
+    const bottomAngle = a + 0.22 + snap * 0.28;
+    const bottomRadius = THREE.MathUtils.lerp(0.12, 0.055, snap);
+    const bottom = new THREE.Vector3(
+      Math.cos(bottomAngle) * bottomRadius,
+      2.52 - snap * 0.16,
+      rim.z + Math.sin(bottomAngle) * bottomRadius
+    );
+    strand.geometry.setFromPoints([top, bottom]);
+  });
 }
 
 function updateResetTimer(dt) {
@@ -813,6 +921,12 @@ function updateBall() {
     return;
   }
 
+  if (game.gather) {
+    shadows.ball.position.set(ball.position.x, 0.012, ball.position.z);
+    shadows.ball.scale.setScalar(0.24);
+    return;
+  }
+
   if (game.move?.kind === 'cross') {
     const p = clamp01(game.move.t / game.move.duration);
     const side = THREE.MathUtils.lerp(game.move.fromHand, game.move.toHand, easeInOut(p));
@@ -821,6 +935,19 @@ function updateBall() {
       offense.root.x + side * (0.5 - pocket * 0.08),
       0.3 + pocket * 0.12,
       offense.root.z + 0.18 + pocket * 0.04
+    );
+    shadows.ball.position.set(ball.position.x, 0.012, ball.position.z);
+    shadows.ball.scale.setScalar(0.26);
+    return;
+  }
+
+  if (game.move?.kind === 'inout') {
+    const p = clamp01(game.move.t / game.move.duration);
+    const fake = Math.sin(p * Math.PI);
+    ball.position.set(
+      offense.root.x + offense.ballHand * 0.46 + game.move.dir.x * fake * 0.18,
+      0.34 + fake * 0.16,
+      offense.root.z + 0.16 + fake * 0.05
     );
     shadows.ball.position.set(ball.position.x, 0.012, ball.position.z);
     shadows.ball.scale.setScalar(0.26);
@@ -856,7 +983,7 @@ function updateCamera(dt) {
   const midpoint = tmpA.copy(offense.root).lerp(defense.root, 0.5);
   const sep = flatDistance(offense.root, defense.root);
   const burst = game.state === 'attack' ? 1 : 0;
-  const gather = game.state === 'stop' || game.state === 'shot' ? 1 : 0;
+  const gather = game.state === 'stop' || game.state === 'gather' || game.state === 'shot' ? 1 : 0;
   const shot = game.shot ? 1 : 0;
 
   cameraRig.targetLookAt.set(
@@ -897,6 +1024,10 @@ function updateCamera(dt) {
 function onPointerDown(event) {
   if (event.clientY < window.innerHeight * 0.34 || input.active) return;
   audio.unlock();
+  if (game.state === 'gather' && game.gather) {
+    startShotFake();
+    return;
+  }
   renderer.domElement.setPointerCapture(event.pointerId);
   input.active = true;
   input.pointerId = event.pointerId;
@@ -933,7 +1064,7 @@ function onPointerMove(event) {
   const drag = Math.hypot(dragX, dragY);
   input.pressure = clamp01(drag / 145);
   if (drag > 3) {
-    input.worldDir.set(dragX, 0, dragY).normalize();
+    screenVectorToWorld(dragX, dragY, input.worldDir);
   }
 
   const flickSpeed = input.velocity.length();
@@ -951,20 +1082,16 @@ function onPointerUp(event) {
   input.pointerId = null;
   input.pressure = 0;
 
-  if (['shot', 'finish', 'check'].includes(game.state)) return;
-  if (heldMs < 190 && input.totalDistance < 28) {
-    startShotFake();
-    return;
-  }
+  if (['gather', 'shot', 'finish', 'check'].includes(game.state)) return;
   if (game.state === 'contact' && heldMs < 420) {
     startShotFake();
     return;
   }
-  startShot();
+  startGather();
 }
 
 function interpretFlick(vx, vy, speed) {
-  const dir = tmpA.set(vx, 0, vy).normalize();
+  const dir = screenVectorToWorld(vx, vy, tmpA);
   const lateral = Math.abs(dir.x) > Math.abs(dir.z) * 1.08;
   const crowd = flatDistance(offense.root, defense.root) < 1.05;
   const defenderOverplays =
@@ -982,6 +1109,8 @@ function interpretFlick(vx, vy, speed) {
   } else if (lateral) {
     if (crowd && defenderOverplays && game.balance < 0.56) {
       startMove('snatchback', dir);
+    } else if (defenderOverplays && Math.sign(dir.x || 1) === offense.ballHand) {
+      startMove('inout', dir);
     } else {
       startMove('cross', dir);
     }
@@ -994,7 +1123,7 @@ function startMove(kind, dir) {
     !game.move || game.move.t / game.move.duration > 0.32 || kind === 'snatchback' || kind === 'stepback';
   if (!canInterrupt) return;
 
-  const durations = { cross: 0.34, snatchback: 0.42, stepback: 0.48, hesi: 0.32 };
+  const durations = { cross: 0.34, inout: 0.36, snatchback: 0.42, stepback: 0.48, hesi: 0.32 };
   const x = Math.sign(dir.x || -offense.ballHand || 1);
   game.move = {
     kind,
@@ -1012,12 +1141,12 @@ function startMove(kind, dir) {
   setState(kind === 'snatchback' || kind === 'stepback' ? 'retreat' : 'probe');
 
   const wrongFootChance =
-    kind === 'hesi' ? 0.46 : kind === 'cross' ? 0.38 : kind === 'snatchback' ? 0.54 : 0.58;
+    kind === 'hesi' ? 0.46 : kind === 'cross' ? 0.38 : kind === 'inout' ? 0.42 : kind === 'snatchback' ? 0.54 : 0.58;
   const contextBoost = game.defenderCrowd * 0.22 + (game.balance > 0.58 ? 0.08 : -0.05);
   if (Math.random() < wrongFootChance + contextBoost) {
     game.defenderWrongWay = kind === 'cross' ? 0.34 : 0.52;
   }
-  if (kind === 'snatchback' || kind === 'stepback' || kind === 'hesi') {
+  if (kind === 'snatchback' || kind === 'stepback' || kind === 'hesi' || kind === 'inout') {
     game.defenderBite = Math.max(game.defenderBite, kind === 'hesi' ? 0.28 : 0.18);
   }
 }
@@ -1030,7 +1159,25 @@ function startBumpStop() {
   offense.pivotSide = offense.ballHand;
 }
 
+function startGather() {
+  if (game.gather || game.shot || game.state === 'finish') return;
+  const metrics = shotMetrics();
+  const lateContest = metrics.contest < 0.42 || game.defenderWrongWay > 0.16;
+  game.defenderContest = Math.max(game.defenderContest, lateContest ? 0.28 : 0.58);
+  game.gather = {
+    t: 0,
+    duration: THREE.MathUtils.lerp(0.2, 0.32, 1 - metrics.balance),
+    metrics
+  };
+  game.move = null;
+  setState('gather');
+  offense.action = 'gather';
+  offense.velocity.multiplyScalar(0.38);
+}
+
 function startShotFake() {
+  game.gather = null;
+  game.move = null;
   setState('shotFake');
   offense.action = 'gather';
   game.balance = clamp01(game.balance + 0.08);
@@ -1046,8 +1193,8 @@ function startShotFake() {
   }, 360);
 }
 
-function startShot() {
-  const metrics = shotMetrics();
+function startShot(lockedMetrics = null) {
+  const metrics = lockedMetrics || shotMetrics();
   const madeRoll = metrics.quality + (Math.random() - 0.5) * 0.12;
   let outcome = 'miss';
   if (madeRoll > 0.88 && metrics.cooked) outcome = 'cookedSwish';
@@ -1056,10 +1203,6 @@ function startShot() {
   else if (madeRoll > 0.5) outcome = 'rimMake';
 
   const made = outcome !== 'miss';
-  const lateContest = metrics.contest < 0.42 || game.defenderWrongWay > 0.16;
-  if (lateContest) game.defenderContest = Math.max(game.defenderContest, 0.28);
-  else game.defenderContest = Math.max(game.defenderContest, 0.58);
-
   setState('shot');
   offense.velocity.multiplyScalar(0.28);
   const start = offense.group.localToWorld(new THREE.Vector3(offense.ballHand * 0.1, 2.24, -0.02));
@@ -1111,7 +1254,7 @@ function shotMetrics() {
     separation > 0.55 &&
     balance > 0.58 &&
     release > 0.56 &&
-    ['cross', 'snatchback', 'stepback', 'hesi'].includes(game.lastMove);
+    ['cross', 'inout', 'snatchback', 'stepback', 'hesi'].includes(game.lastMove);
   return { sep, separation, wrongWay, contest, balance, gather, release, fatigue, quality, cooked };
 }
 
@@ -1211,6 +1354,7 @@ function resetPossession(initial) {
   game.balance = 0.88;
   game.fatigue = 0;
   game.move = null;
+  game.gather = null;
   game.shot = null;
   game.replay = null;
   game.defenderSamples.length = 0;
@@ -1218,6 +1362,7 @@ function resetPossession(initial) {
   game.defenderBite = 0;
   game.defenderContest = 0;
   game.defenderCrowd = 0;
+  game.netPinch = 0;
   game.lastMove = initial ? 'check' : 'reset';
   game.lastMoveTime = 2;
   labGuides.trail.length = 0;
@@ -1280,6 +1425,7 @@ function updateLab() {
   labReadout.innerHTML = [
     ['state', game.state],
     ['move', movePhase],
+    ['def', game.defenderState],
     ['hand', offense.ballHand > 0 ? 'right' : 'left'],
     ['sep', `${metrics.sep.toFixed(2)}m`],
     ['balance', metrics.balance.toFixed(2)],
@@ -1368,7 +1514,10 @@ function createHoop() {
     const top = new THREE.Vector3(Math.cos(a) * 0.22, 3.02, rim.z + Math.sin(a) * 0.22);
     const bottom = new THREE.Vector3(Math.cos(a + 0.22) * 0.12, 2.52, rim.z + Math.sin(a + 0.22) * 0.12);
     const geo = new THREE.BufferGeometry().setFromPoints([top, bottom]);
-    scene.add(new THREE.Line(geo, materials.net));
+    const strand = new THREE.Line(geo, materials.net);
+    strand.userData.angle = a;
+    scene.add(strand);
+    netLines.push(strand);
   }
 }
 
@@ -1543,6 +1692,19 @@ function flatDistance(a, b) {
   const dx = a.x - b.x;
   const dz = a.z - b.z;
   return Math.hypot(dx, dz);
+}
+
+function screenVectorToWorld(dx, dy, out) {
+  tmpB.copy(cameraRig.lookAt).sub(cameraRig.position);
+  tmpB.y = 0;
+  if (tmpB.lengthSq() < 0.0001) tmpB.set(0, 0, -1);
+  tmpB.normalize();
+  tmpC.set(-tmpB.z, 0, tmpB.x).normalize();
+  out.copy(tmpC).multiplyScalar(dx).addScaledVector(tmpB, -dy);
+  out.y = 0;
+  if (out.lengthSq() < 0.0001) out.set(0, 0, 0);
+  else out.normalize();
+  return out;
 }
 
 function clamp(value, min, max) {
