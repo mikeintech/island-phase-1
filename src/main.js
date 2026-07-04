@@ -173,19 +173,19 @@ class StickPlayer {
       hips: sphere(0.045, shortsMaterial),
       chest: sphere(0.045, jerseyMaterial),
       head: sphere(0.145, headMaterial),
-      leftHand: sphere(0.062, limbMaterial),
-      rightHand: sphere(0.062, limbMaterial),
+      leftHand: sphere(0.07, limbMaterial),
+      rightHand: sphere(0.07, limbMaterial),
       leftFoot: foot(shoeMaterial),
       rightFoot: foot(shoeMaterial),
-      jersey: new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.68, 10, 20), jerseyMaterial),
-      shorts: new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.18, 8, 16), shortsMaterial),
+      jersey: new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.72, 10, 22), jerseyMaterial),
+      shorts: new THREE.Mesh(new THREE.CapsuleGeometry(0.21, 0.2, 8, 18), shortsMaterial),
       pivot: ring(accentMaterial),
       ballHand: sphere(0.045, accentMaterial),
       limbs: []
     };
 
     for (let i = 0; i < 10; i += 1) {
-      const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.88, 6, 12), limbMaterial);
+      const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.88, 6, 14), limbMaterial);
       limb.castShadow = true;
       this.parts.limbs.push(limb);
       this.group.add(limb);
@@ -249,10 +249,10 @@ class StickPlayer {
     const hips = new THREE.Vector3(leanX * 0.34, hipY, leanZ * 0.3);
     const chest = new THREE.Vector3(leanX, shoulderY, leanZ);
     const head = new THREE.Vector3(leanX * 1.05, 1.82 + low + rise + jump, leanZ * 1.05);
-    const leftHip = new THREE.Vector3(-0.19 + leanX * 0.22, hipY - 0.04, leanZ * 0.16);
-    const rightHip = new THREE.Vector3(0.19 + leanX * 0.22, hipY - 0.04, leanZ * 0.16);
-    const leftShoulder = new THREE.Vector3(-0.32 + leanX, shoulderY, leanZ);
-    const rightShoulder = new THREE.Vector3(0.32 + leanX, shoulderY, leanZ);
+    const leftHip = new THREE.Vector3(-0.18 + leanX * 0.22, hipY - 0.04, leanZ * 0.16);
+    const rightHip = new THREE.Vector3(0.18 + leanX * 0.22, hipY - 0.04, leanZ * 0.16);
+    const leftShoulder = new THREE.Vector3(-0.3 + leanX, shoulderY, leanZ);
+    const rightShoulder = new THREE.Vector3(0.3 + leanX, shoulderY, leanZ);
     const leftFoot = new THREE.Vector3(-stance - stride * cross, footY, stride * forward);
     const rightFoot = new THREE.Vector3(stance + stride * cross, footY, -stride * forward);
     if (crossLoad > 0) {
@@ -272,26 +272,27 @@ class StickPlayer {
     const rightKnee = rightHip.clone().lerp(rightFoot, 0.5).add(new THREE.Vector3(0.06, -0.05, -0.05));
     const dribbleSide = this.ballHand;
     const offSide = -dribbleSide;
-    const ballY = 0.48 + Math.abs(Math.sin(this.phase * 1.6)) * 0.36;
+    const dribbleBeat = Math.abs(Math.sin(this.phase * 1.6));
+    const ballY = 0.38 + dribbleBeat * 0.42;
     const activeHand = new THREE.Vector3(
-      dribbleSide * (0.34 + 0.08 * Math.sin(this.phase)),
-      ballY + 0.02,
-      0.08 + leanZ * 0.4
+      dribbleSide * (0.32 + 0.08 * Math.sin(this.phase)),
+      ballY + 0.03,
+      0.17 + leanZ * 0.36
     );
-    const offHand = new THREE.Vector3(
-      offSide * (0.44 + this.contest * 0.18),
-      0.98 + handLift,
-      0.02
-    );
+    const offHand = new THREE.Vector3(offSide * 0.28, 1.06 + handLift * 0.35, 0.15);
+    if (this.action === 'defense') {
+      activeHand.set(dribbleSide * 0.54, 0.98 + handLift * 0.25, 0.08);
+      offHand.set(offSide * 0.54, 0.98 + handLift * 0.25, 0.08);
+    }
     if (crossLoad > 0) {
       const from = activeMove.fromHand ?? -dribbleSide;
       const to = activeMove.toHand ?? dribbleSide;
       const side = THREE.MathUtils.lerp(from, to, easeInOut(moveP));
       activeHand.set(side * (0.5 - crossLoad * 0.08), 0.43 + crossLoad * 0.1, 0.18);
-      offHand.set(-side * 0.46, 0.82 - crossLoad * 0.08, -0.02);
+      offHand.set(-side * 0.22, 0.94 - crossLoad * 0.06, 0.18);
     } else if (retreatLoad > 0) {
       activeHand.set(dribbleSide * 0.42, 0.62 + retreatLoad * 0.12, 0.22 + retreatLoad * 0.08);
-      offHand.set(offSide * 0.38, 0.94, -0.02);
+      offHand.set(offSide * 0.28, 1.0, 0.15);
     }
     if (this.action === 'gather') {
       activeHand.set(dribbleSide * 0.12, 1.36, 0.06);
@@ -322,10 +323,12 @@ class StickPlayer {
     this.bite = Math.max(0, this.bite - dt * 2.8);
     this.beat = Math.max(0, this.beat - dt * 1.35);
 
-    if (speed > 0.04) {
-      const targetFacing = Math.atan2(this.velocity.z, this.velocity.x);
+    const shouldFaceRim = speed <= 0.04 && this.role === 'offense';
+    if (speed > 0.04 || shouldFaceRim) {
+      const faceVector = shouldFaceRim ? tmpA.copy(rimFloor).sub(this.root) : this.velocity;
+      const targetFacing = Math.atan2(faceVector.z, faceVector.x);
       this.facing = lerpAngle(this.facing, targetFacing, 1 - Math.exp(-dt * 8));
-      this.lean.set(this.velocity.x / 4.8, this.velocity.z / 4.8);
+      if (speed > 0.04) this.lean.set(this.velocity.x / 4.8, this.velocity.z / 4.8);
     } else {
       this.lean.multiplyScalar(Math.exp(-dt * 5));
     }
@@ -345,11 +348,11 @@ class StickPlayer {
       this.parts.jersey,
       tmpA.copy(pose.hips).add(new THREE.Vector3(0, 0.04, 0)),
       tmpC.copy(pose.chest).add(new THREE.Vector3(0, -0.09, 0)),
-      1.0,
-      0.82
+      1.06,
+      0.92
     );
     this.parts.shorts.position.copy(pose.hips).add(new THREE.Vector3(0, -0.14, 0.02));
-    this.parts.shorts.scale.set(0.9, 0.38, 0.72);
+    this.parts.shorts.scale.set(0.98, 0.44, 0.82);
     this.parts.shorts.quaternion.identity();
     this.parts.pivot.visible = game.state === 'stop' || game.state === 'contact' || game.state === 'shotFake';
     this.parts.pivot.position.copy(this.pivotSide > 0 ? pose.feet.right : pose.feet.left);
@@ -357,13 +360,13 @@ class StickPlayer {
 
     const limbs = this.parts.limbs;
     limbs[0].visible = false;
-    placeLimb(limbs[1], tmpA.copy(pose.chest).add(new THREE.Vector3(0, 0.03, 0)), pose.head, 0.025);
-    placeLimb(limbs[2], pose.shoulders.left, pose.hands.left, 0.026);
-    placeLimb(limbs[3], pose.shoulders.right, pose.hands.right, 0.026);
-    placeLimb(limbs[4], pose.hipsSide.left, pose.knees.left, 0.031);
-    placeLimb(limbs[5], pose.knees.left, pose.feet.left, 0.03);
-    placeLimb(limbs[6], pose.hipsSide.right, pose.knees.right, 0.031);
-    placeLimb(limbs[7], pose.knees.right, pose.feet.right, 0.03);
+    placeLimb(limbs[1], tmpA.copy(pose.chest).add(new THREE.Vector3(0, 0.04, 0)), pose.head, 0.034);
+    placeLimb(limbs[2], pose.shoulders.left, pose.hands.left, 0.04);
+    placeLimb(limbs[3], pose.shoulders.right, pose.hands.right, 0.04);
+    placeLimb(limbs[4], pose.hipsSide.left, pose.knees.left, 0.047);
+    placeLimb(limbs[5], pose.knees.left, pose.feet.left, 0.045);
+    placeLimb(limbs[6], pose.hipsSide.right, pose.knees.right, 0.047);
+    placeLimb(limbs[7], pose.knees.right, pose.feet.right, 0.045);
     limbs[8].visible = false;
     limbs[9].visible = false;
   }
