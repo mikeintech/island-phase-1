@@ -1,0 +1,191 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #101211;
+  color: #f4f1e8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+body {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(247, 190, 78, 0.12), transparent 30%),
+    linear-gradient(180deg, #191b19 0%, #101211 60%, #0b0c0b 100%);
+}
+
+#app {
+  position: relative;
+}
+
+#game,
+#game canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#hud {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  left: 14px;
+  right: 14px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.hud-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.brand {
+  justify-self: start;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #f7be4e;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
+}
+
+.score,
+.clock {
+  min-width: 62px;
+  border: 1px solid rgba(244, 241, 232, 0.16);
+  background: rgba(9, 10, 9, 0.54);
+  backdrop-filter: blur(12px);
+  color: #f4f1e8;
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+}
+
+.clock {
+  justify-self: end;
+  color: #96e1c8;
+}
+
+.mode-toggle {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  width: min(240px, calc(100vw - 28px));
+  margin: 10px auto 0;
+  padding: 4px;
+  border: 1px solid rgba(244, 241, 232, 0.12);
+  border-radius: 8px;
+  background: rgba(9, 10, 9, 0.48);
+  backdrop-filter: blur(14px);
+}
+
+.mode-toggle button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(244, 241, 232, 0.7);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.mode-toggle button.active {
+  background: #f4f1e8;
+  color: #101211;
+}
+
+.result-panel {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(244, 241, 232, 0.14);
+  border-radius: 8px;
+  background: rgba(9, 10, 9, 0.66);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    visibility 160ms ease;
+  visibility: visible;
+}
+
+.result-panel.hidden {
+  display: none;
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.result-text {
+  font-size: clamp(1.35rem, 6vw, 2.15rem);
+  line-height: 0.95;
+  font-weight: 900;
+  color: #f7be4e;
+}
+
+.breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.breakdown div {
+  min-width: 0;
+}
+
+.breakdown dt {
+  margin: 0 0 3px;
+  color: rgba(244, 241, 232, 0.58);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.breakdown dd {
+  margin: 0;
+  color: #f4f1e8;
+  font-size: 0.95rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+@media (min-aspect-ratio: 1 / 1) {
+  #app {
+    width: min(100vw, 520px);
+    margin: 0 auto;
+    background: #101211;
+    box-shadow: 0 0 0 1px rgba(244, 241, 232, 0.08);
+  }
+}

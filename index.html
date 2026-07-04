@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#101211" />
+    <title>Island Phase 1</title>
+  </head>
+  <body>
+    <main id="app">
+      <div id="game"></div>
+      <section id="hud" aria-label="Game status">
+        <div class="hud-row">
+          <div class="brand">ISLAND</div>
+          <div class="score" id="score">0 - 0</div>
+          <div class="clock" id="clock">12.0</div>
+        </div>
+        <div class="mode-toggle" role="group" aria-label="Mode">
+          <button id="freeMode" class="active" type="button">Free Play</button>
+          <button id="scoreMode" type="button">First To 7</button>
+        </div>
+      </section>
+      <section id="resultPanel" class="result-panel hidden" aria-live="polite">
+        <div id="resultText" class="result-text">Pure Swish</div>
+        <dl id="breakdown" class="breakdown"></dl>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
