@@ -153,7 +153,7 @@
     <div class="hRows">
       <b>Drag</b> to probe, slide, or attack based on distance.<br/>
       <b>Flick across your body</b> while moving for a low between-leg counter.<br/>
-      <b>Flick diagonal forward</b> for a curl cross into the lane.<br/>
+      <b>Flick diagonal forward</b> for a curl cross into the lane. Crosses load into a side hesi.<br/>
       <b>Flick back</b> for snatchback. <b>Back-diagonal</b> gives stepback, or spin when crowded.<br/>
       <b>Pause while moving</b> for a one-hand hesi. Release to gather and shoot. Tap right back to pump fake.
     </div>
@@ -176,7 +176,7 @@
     <div class="howto">
       <b>one thumb.</b> lower half of the screen.<br/>
       <b>hold + drag</b> — dribble, probe, drive<br/>
-      <b>flick left / right</b> — cross · in-and-out<br/>
+      <b>flick left / right</b> — cross · in-and-out · side hesi load<br/>
       <b>flick across body</b> — between-leg counter<br/>
       <b>flick back</b> — snatchback&nbsp;&nbsp;<b>back-diagonal</b> — stepback or spin<br/>
       <b>drive into his chest</b> — bump stop, then pivot<br/>
@@ -608,11 +608,14 @@ function makeFigure(bodyCol, accentCol, isDef) {
     const spd = hyp(vx, vz);
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     const rx = -fz, rz = fx;
+    const move = p.move || '', moveT = p.moveT || 0, moveDir = p.moveDir || 0;
+    const hesiPose = move === 'hesi' || ((move === 'cross' || move === 'curlcross') && moveT > 0.60);
+    const hesiSide = hesiPose ? (moveDir || p.hand || 1) : 0;
     const rootY = P.HIP * (1 - crouch * 0.34) + lift;
-    const leanX = clamp(vx * 0.052, -0.3, 0.3) + fx * crouch * 0.10 + (p.leanX || 0);
-    const leanZ = clamp(vz * 0.052, -0.3, 0.3) + fz * crouch * 0.10 + (p.leanZ || 0);
+    const leanX = clamp(vx * 0.052, -0.3, 0.3) + fx * crouch * 0.10 + rx * hesiSide * 0.08 + (p.leanX || 0);
+    const leanZ = clamp(vz * 0.052, -0.3, 0.3) + fz * crouch * 0.10 + rz * hesiSide * 0.08 + (p.leanZ || 0);
     const shX = x + leanX, shZ = z + leanZ;
-    const shY = rootY + (P.SH - P.HIP) * (1 - crouch * 0.10);
+    const shY = rootY + (P.SH - P.HIP) * (1 - crouch * 0.10) + (hesiPose ? 0.075 : 0);
     const hdX = shX + leanX * 0.4, hdZ = shZ + leanZ * 0.4;
     const hdY = shY + (P.HEADY - P.SH);
 
@@ -680,9 +683,14 @@ function makeFigure(bodyCol, accentCol, isDef) {
     function setT(i, tx, ty, tz) { tgt[i][0] = tx; tgt[i][1] = ty; tgt[i][2] = tz; }
     const bx = p.bx, by = p.by, bz = p.bz;
     if (style === STYLE.DRIB) {
-      setT(ballIdx, bx, by, bz);
+      const raise = hesiPose ? 0.20 : 0;
+      setT(ballIdx, bx, Math.max(by, rootY + 0.72 + raise), bz);
       const o = 1 - ballIdx, os = o === 0 ? -1 : 1;
-      setT(o, x + fx * 0.26 + rx * os * 0.32, rootY + 0.30, z + fz * 0.26 + rz * os * 0.32);
+      if (hesiPose) {
+        setT(o, shX + fx * 0.18 + rx * os * 0.44, shY + 0.32, shZ + fz * 0.18 + rz * os * 0.44);
+      } else {
+        setT(o, x + fx * 0.26 + rx * os * 0.32, rootY + 0.30, z + fz * 0.26 + rz * os * 0.32);
+      }
     } else if (style === STYLE.HELD || style === STYLE.GATH || style === STYLE.RISE) {
       setT(0, bx - rx * 0.09, by, bz - rz * 0.09);
       setT(1, bx + rx * 0.09, by, bz + rz * 0.09);
@@ -1002,12 +1010,12 @@ function startMove(type, dir, wx, wz) {
   const M = { type, t: 0, dur: 0.26, dir, fromHand: O.hand, toHand: O.hand, snapped: false };
   switch (type) {
     case 'cross':
-      M.dur = 0.42; M.toHand = -O.hand; O.lowT = 0.2; O.hang = 0.12;
+      M.dur = 0.48; M.toHand = -O.hand; O.lowT = 0.2; O.hang = 0.18;
       impulse(-rx * dir * 0.55, -rz * dir * 0.55);
       D.event('lat', dir, 0.9); SND.squeak(0.6); chainUp();
       break;
     case 'curlcross':
-      M.dur = 0.46; M.toHand = -O.hand; O.lowT = 0.2; O.hang = 0.10;
+      M.dur = 0.50; M.toHand = -O.hand; O.lowT = 0.2; O.hang = 0.16;
       impulse(rx * dir * 0.55 + fx * 0.75, rz * dir * 0.55 + fz * 0.75);
       D.event('drive', dir, 0.85); SND.squeak(0.75); chainUp(2);
       break;
@@ -1213,7 +1221,8 @@ function offenseUpdate(dt) {
       if (inp.flickWorld && !O.move) interpretFlick(inp.flickWorld);
       else if (inp.flickWorld && O.move) {
         const p = O.move.t / O.move.dur;
-        const canCancel = (O.move.type === 'hesi' && p > 0.22) || p > 0.46 ||
+        const canCancel = (O.move.type === 'hesi' && p > 0.22) ||
+          ((O.move.type === 'cross' || O.move.type === 'curlcross') && p > 0.38) || p > 0.46 ||
           O.move.type === 'inout' || (O.move.type === 'between' && p > 0.52) ||
           (O.move.type === 'spin' && p > 0.62);
         if (canCancel) { O.move = null; interpretFlick(inp.flickWorld); }
@@ -1247,6 +1256,12 @@ function offenseUpdate(dt) {
                   rz * M.dir * pwr + (M.type === 'curlcross' ? fz * 1.45 : 0));
         }
         if (t < 0.36) O.hang = Math.max(O.hang, 0.05);
+        if (t > 0.60) {
+          O.hang = Math.max(O.hang, 0.18);
+          O.crouch = dampN(O.crouch, 0.18, 14, dt);
+          O.windowT = Math.max(O.windowT, 0.25);
+          O.windowType = 'hesi';
+        }
       }
       if (M.type === 'between') {
         const t = clamp(M.t / M.dur, 0, 1);
@@ -1956,6 +1971,8 @@ function poseFigures(dt) {
   figO.pose({
     x: O.x, z: O.z, yaw: O.yaw, crouch: O.crouch, lift: O.lift,
     vx: O.vx, vz: O.vz, style: oStyle, hand: O.hand,
+    move: O.move ? O.move.type : '', moveT: O.move ? clamp(O.move.t / O.move.dur, 0, 1) : 0,
+    moveDir: O.move ? O.move.dir : 0,
     bx: ball.x, by: ball.y, bz: ball.z,
     pivot: (O.pickedUp && O.st === 'stopped') ? O.pivot : -1,
     plant: O.windowT > 0 && (O.windowType === 'step' || O.windowType === 'bump')
