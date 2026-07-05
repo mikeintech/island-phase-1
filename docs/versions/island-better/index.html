@@ -1344,8 +1344,9 @@ function offenseUpdate(dt) {
       O.contactCd = 0.8;
       if (!O.pivotShown) { showCue('bump stop — release to shoot · tap again to fake'); O.pivotShown = true; }
     }
-    O.x += nx * push * 0.7; O.z += nzv * push * 0.7;
-    D.x -= nx * push * 0.5; D.z -= nzv * push * 0.5;
+    const hold = O.pickedUp && O.st === 'stopped';
+    O.x += nx * push * (hold ? 0.12 : 0.7); O.z += nzv * push * (hold ? 0.12 : 0.7);
+    D.x -= nx * push * (hold ? 0.95 : 0.5); D.z -= nzv * push * (hold ? 0.95 : 0.5);
   }
 }
 
@@ -1362,18 +1363,23 @@ function resolvePlayerContact(dt) {
   const nx = dx / dd, nzv = dz / dd;
   const lane = laneInfo();
   const laneCut = lane.between > 0.25 && lane.laneGap < 0.95 && !earned;
+  const hold = O.pickedUp && O.st === 'stopped';
   O.clampT = laneCut ? O.clampT + dt : Math.max(0, O.clampT - dt * 4);
-  const oShare = laneCut ? 0.92 : earned ? 0.62 : 0.82;
+  const oShare = hold ? 0.12 : laneCut ? 0.92 : earned ? 0.62 : 0.82;
   O.x += nx * ov * oShare; O.z += nzv * ov * oShare;
   D.x -= nx * ov * (1 - oShare); D.z -= nzv * ov * (1 - oShare);
 
   const rimward = O.vx * lane.fx + O.vz * lane.fz;
-  if (rimward > 0 && laneCut) {
+  if (!hold && rimward > 0 && laneCut) {
     O.vx -= lane.fx * rimward * 0.86;
     O.vz -= lane.fz * rimward * 0.86;
   }
-  O.vx = (O.vx + nx * ov * 3.2) * (laneCut ? 0.35 : 0.58);
-  O.vz = (O.vz + nzv * ov * 3.2) * (laneCut ? 0.35 : 0.58);
+  if (hold) {
+    O.vx = 0; O.vz = 0;
+  } else {
+    O.vx = (O.vx + nx * ov * 3.2) * (laneCut ? 0.35 : 0.58);
+    O.vz = (O.vz + nzv * ov * 3.2) * (laneCut ? 0.35 : 0.58);
+  }
   D.vx -= nx * ov * 1.1; D.vz -= nzv * ov * 1.1;
 
   if (laneCut && O.clampT > 0.18 && !O.move && !O.pickedUp && O.st === 'dribble' && O.contactCd <= 0) {
