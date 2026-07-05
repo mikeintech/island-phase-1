@@ -128,17 +128,46 @@
   .labTitle{font-size:13px;font-weight:900;letter-spacing:.22em;color:var(--gold)}
   .labSub{font-size:9px;letter-spacing:.16em;color:var(--dim);line-height:1.5;margin-bottom:10px;text-transform:uppercase}
   .labGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
-  .labQuadrants{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:9px 0}
-  .labQuadrants button{min-height:58px;padding:8px;border-color:var(--dim2);font-size:9px;line-height:1.35;text-align:left}
-  .labQuadrants b{display:block;color:var(--gold);font-size:10px;margin-bottom:3px}
+  .labPadGrid{display:grid;grid-template-columns:1fr;gap:10px;margin:9px 0}
+  .labPad{border:1px solid var(--dim2);padding:9px;background:rgba(242,236,223,.035)}
+  .labPadTitle{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    font-size:10px;font-weight:900;letter-spacing:.18em;color:var(--gold);text-transform:uppercase;margin-bottom:7px}
+  .labPadRead{font-size:9px;color:var(--dim);letter-spacing:.08em}
+  .labPadBox{position:relative;height:146px;border:1px solid rgba(242,236,223,.28);
+    background:
+      linear-gradient(90deg,transparent calc(50% - 1px),rgba(242,236,223,.24) calc(50% - 1px),rgba(242,236,223,.24) calc(50% + 1px),transparent calc(50% + 1px)),
+      linear-gradient(0deg,transparent calc(50% - 1px),rgba(242,236,223,.24) calc(50% - 1px),rgba(242,236,223,.24) calc(50% + 1px),transparent calc(50% + 1px)),
+      radial-gradient(circle at 50% 50%,rgba(255,207,77,.12),rgba(242,236,223,.035) 42%,rgba(0,0,0,.12));
+    overflow:hidden;touch-action:none}
+  .labPadBox::before{content:'';position:absolute;inset:0;
+    background:linear-gradient(135deg,rgba(255,90,38,.10),transparent 42%,rgba(139,255,225,.10));pointer-events:none}
+  .labPadKnob{position:absolute;left:50%;top:50%;width:24px;height:24px;border-radius:50%;
+    border:2px solid var(--bone);background:var(--gold);box-shadow:0 0 28px rgba(255,207,77,.45);
+    transform:translate(-50%,-50%);pointer-events:none}
+  .labAxis{position:absolute;font-size:8px;font-weight:900;letter-spacing:.14em;color:rgba(242,236,223,.64);
+    text-transform:uppercase;pointer-events:none;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+  .labAxis.l{left:7px;top:50%;transform:translateY(-50%)}
+  .labAxis.r{right:7px;top:50%;transform:translateY(-50%)}
+  .labAxis.t{left:50%;top:7px;transform:translateX(-50%)}
+  .labAxis.b{left:50%;bottom:7px;transform:translateX(-50%)}
   .labActions{display:flex;gap:7px;flex-wrap:wrap;margin:9px 0}
   .labActions button,#labPanel .labTop button{font-size:9px;padding:7px 9px;letter-spacing:.12em}
+  .labActions button.active{border-color:var(--gold);color:var(--gold)}
   .labSection{border-top:1px solid var(--dim2);padding-top:10px;margin-top:10px}
   .labRow{display:grid;grid-template-columns:95px 1fr 54px;align-items:center;gap:8px;margin:7px 0}
   .labRow label{font-size:9px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
   .labRow input[type=range]{padding:0}
   .labRow input[type=number]{padding:6px;text-align:right}
+  #labPanel:not(.fine) #labControls{display:none}
   .labMsg{font-size:9px;letter-spacing:.12em;color:var(--gold);min-height:14px;text-transform:uppercase}
+  @media (min-width:860px) and (min-height:620px){
+    #stage.labSide{overflow:visible;transform:translateX(calc(-50% - 225px))}
+    #stage.labSide #labPanel{left:calc(100% + 16px);right:auto;top:calc(12px + env(safe-area-inset-top));
+      bottom:12px;width:min(420px,calc(100vw - 500px));min-width:330px;max-height:none}
+    #stage.labSide #btnLab{right:14px}
+    #stage.labSide .labPadGrid{grid-template-columns:1fr 1fr}
+    #stage.labSide .labPadBox{height:132px}
+  }
   #endTitle{font-size:56px}
   .goldT{color:var(--gold)}
   .heatT{color:var(--heat)}
@@ -198,20 +227,17 @@
     </div>
     <textarea id="labNotes" placeholder="notes: what changed, what feels better, what still breaks"></textarea>
     <div class="labActions">
-      <button id="labTestCross">TEST CROSS</button>
-      <button id="labTestCurl">TEST CURL</button>
-      <button id="labTestBehind">TEST BEHIND</button>
-      <button id="labTestPullup">TEST PULL-UP</button>
+      <button id="labTestCross">LOOP CROSS</button>
+      <button id="labTestCurl">LOOP CURL</button>
+      <button id="labTestBehind">LOOP BEHIND</button>
+      <button id="labTestPullup">LOOP PULL-UP</button>
+      <button id="labStopLoop">STOP LOOP</button>
+      <button id="labFineToggle">FINE SLIDERS</button>
       <button id="labReset">RESET</button>
     </div>
     <div class="labSection">
-      <div class="labSub">4-quadrant sweep grid</div>
-      <div class="labQuadrants" id="labQuadrants">
-        <button data-q="timing"><b>Q1 TIMING</b>faster load, earlier snap, quicker rise</button>
-        <button data-q="body"><b>Q2 BODY</b>lower hips, stronger shoulder sell, wider arms</button>
-        <button data-q="ball"><b>Q3 BALL</b>higher hang, lower bounce, bigger sweep</button>
-        <button data-q="shot"><b>Q4 PULL-UP</b>cleaner gather, higher release, harder stop</button>
-      </div>
+      <div class="labSub">2x2 sweep pads · drag while the selected move loops</div>
+      <div class="labPadGrid" id="labPads"></div>
     </div>
     <div id="labControls" class="labSection"></div>
     <div class="labSection">
@@ -341,7 +367,7 @@ const ui = {
   labTitleInput: $('labTitleInput'), labAuthorInput: $('labAuthorInput'), labNotes: $('labNotes'),
   labControls: $('labControls'), labSlots: $('labSlots'), labJson: $('labJson'), labMsg: $('labMsg'),
   labTestCross: $('labTestCross'), labTestCurl: $('labTestCurl'), labTestBehind: $('labTestBehind'),
-  labTestPullup: $('labTestPullup'), labQuadrants: $('labQuadrants'),
+  labTestPullup: $('labTestPullup'), labStopLoop: $('labStopLoop'), labFineToggle: $('labFineToggle'), labPads: $('labPads'),
   labReset: $('labReset'), labSave: $('labSave'), labLoad: $('labLoad'), labDelete: $('labDelete'),
   labExport: $('labExport'), labImport: $('labImport'), labCopy: $('labCopy'),
   menu: $('menu'), end: $('end'), endTitle: $('endTitle'), endSub: $('endSub'),
@@ -2217,7 +2243,65 @@ function checkIdle(dt) {
 
 /* ---------- mechanics lab ---------- */
 const LAB_STORE = 'island.mechanics.artifacts.v1';
-const LAB = { open: false, controls: [] };
+const LAB = { open: false, controls: [], pads: [], dragPad: null, preview: 'pullup', looping: false, nextPreviewT: 0, fine: false };
+const LAB_PADS = [
+  {
+    id: 'timing', title: 'timing', xNeg: 'slower', xPos: 'faster', yNeg: 'later', yPos: 'snappier',
+    ops: [
+      { axis: 'x', path: 'cross.dur.cross', scale: -0.22 }, { axis: 'x', path: 'cross.dur.curlcross', scale: -0.22 },
+      { axis: 'x', path: 'cross.dur.behind', scale: -0.18 }, { axis: 'x', path: 'shot.gather.baseDur', scale: -0.18 },
+      { axis: 'x', path: 'shot.rise.dur', scale: -0.16 }, { axis: 'y', path: 'cross.timing.loadEnd', delta: -0.035 },
+      { axis: 'y', path: 'cross.timing.dropEnd', delta: -0.045 }, { axis: 'y', path: 'cross.timing.catchEnd', delta: -0.055 },
+      { axis: 'y', path: 'cross.timing.snap', delta: -0.050 }, { axis: 'y', path: 'cross.timing.bounce', delta: -0.040 }
+    ]
+  },
+  {
+    id: 'body', title: 'body shape', xNeg: 'compact', xPos: 'wide sell', yNeg: 'taller', yPos: 'lower',
+    ops: [
+      { axis: 'x', path: 'cross.body.shoulderSell', delta: 0.36 }, { axis: 'x', path: 'cross.body.shoulderCatch', delta: 0.28 },
+      { axis: 'x', path: 'cross.body.handSpreadMin', delta: 0.08 }, { axis: 'x', path: 'cross.body.handSpreadMax', delta: 0.11 },
+      { axis: 'y', path: 'cross.body.crouchLoad', delta: 0.16 }, { axis: 'y', path: 'cross.body.crouchExit', delta: 0.08 },
+      { axis: 'y', path: 'cross.body.behindLoad', delta: 0.13 }, { axis: 'y', path: 'shot.gather.crouch', delta: 0.12 }
+    ]
+  },
+  {
+    id: 'ball', title: 'ball path', xNeg: 'tight', xPos: 'sweep', yNeg: 'quick drop', yPos: 'hang high',
+    ops: [
+      { axis: 'x', path: 'cross.lat.loadSide', delta: 0.16 }, { axis: 'x', path: 'cross.lat.crossCatch', delta: 0.16 },
+      { axis: 'x', path: 'cross.lat.curlCatch', delta: 0.18 }, { axis: 'x', path: 'cross.fwd.crossPeak', delta: 0.11 },
+      { axis: 'x', path: 'cross.fwd.curlPeak', delta: 0.13 }, { axis: 'x', path: 'cross.fwd.behindPeak', delta: -0.12 },
+      { axis: 'y', path: 'cross.ball.crossHang', delta: 0.18 }, { axis: 'y', path: 'cross.ball.crossFloor', delta: -0.055 },
+      { axis: 'y', path: 'cross.ball.behindHang', delta: 0.12 }, { axis: 'y', path: 'cross.ball.behindFloor', delta: -0.08 }
+    ]
+  },
+  {
+    id: 'exit', title: 'exit burst', xNeg: 'less side', xPos: 'side snap', yNeg: 'hold', yPos: 'drive out',
+    ops: [
+      { axis: 'x', path: 'cross.impulse.crossSnap', delta: 0.80 }, { axis: 'x', path: 'cross.impulse.curlSnapLat', delta: 0.90 },
+      { axis: 'x', path: 'cross.impulse.behindSnapLat', delta: 0.75 }, { axis: 'x', path: 'cross.impulse.crossLoad', delta: 0.20 },
+      { axis: 'y', path: 'cross.impulse.curlSnapFwd', delta: 0.72 }, { axis: 'y', path: 'cross.impulse.curlFwd', delta: 0.36 },
+      { axis: 'y', path: 'cross.impulse.behindFwd', delta: 0.28 }, { axis: 'y', path: 'shot.rise.pullupStop', delta: -0.16 }
+    ]
+  },
+  {
+    id: 'pullup', title: 'pull-up gather', xNeg: 'patient', xPos: 'quick', yNeg: 'set', yPos: 'rise',
+    ops: [
+      { axis: 'x', path: 'shot.trigger.pullupFwdV', delta: -0.32 }, { axis: 'x', path: 'shot.gather.baseDur', scale: -0.22 },
+      { axis: 'x', path: 'shot.rise.dur', scale: -0.18 }, { axis: 'x', path: 'shot.gather.speedAdd', delta: -0.025 },
+      { axis: 'y', path: 'shot.rise.pullupJump', delta: 0.14 }, { axis: 'y', path: 'shot.gather.crouch', delta: 0.10 },
+      { axis: 'y', path: 'shot.gather.ballY', delta: 0.10 }, { axis: 'y', path: 'shot.release.yEnd', delta: 0.12 }
+    ]
+  },
+  {
+    id: 'release', title: 'release form', xNeg: 'tucked', xPos: 'forward', yNeg: 'lower', yPos: 'high arc',
+    ops: [
+      { axis: 'x', path: 'shot.gather.ballFwd', delta: 0.08 }, { axis: 'x', path: 'shot.release.fwdStart', delta: 0.08 },
+      { axis: 'x', path: 'shot.release.fwdEnd', delta: 0.06 }, { axis: 'x', path: 'shot.rise.fadeBack', delta: -0.22 },
+      { axis: 'y', path: 'shot.release.yEnd', delta: 0.15 }, { axis: 'y', path: 'shot.gather.fakeLift', delta: 0.10 },
+      { axis: 'y', path: 'shot.rise.setJump', delta: 0.08 }, { axis: 'y', path: 'shot.rise.fadeJump', delta: 0.07 }
+    ]
+  }
+];
 const LAB_CONTROLS = [
   ['cross.dur.cross', 'cross duration', 0.24, 0.70, 0.01],
   ['cross.dur.curlcross', 'curl duration', 0.24, 0.76, 0.01],
@@ -2356,35 +2440,80 @@ function labScale(path, scale) {
   const min = ctrl ? ctrl[2] : -999, max = ctrl ? ctrl[3] : 999;
   pathSet(MECH, path, clamp(Number(pathGet(MECH, path)) * scale, min, max));
 }
-function labApplyQuadrant(q) {
-  if (q === 'timing') {
-    ['cross.dur.cross', 'cross.dur.curlcross', 'cross.dur.behind', 'shot.gather.baseDur', 'shot.rise.dur'].forEach(p => labScale(p, 0.92));
-    ['cross.timing.loadEnd', 'cross.timing.dropEnd', 'cross.timing.catchEnd', 'cross.timing.snap', 'cross.timing.bounce'].forEach(p => labNudge(p, -0.015));
-  } else if (q === 'body') {
-    labNudge('cross.body.crouchLoad', 0.05);
-    labNudge('cross.body.shoulderSell', 0.10);
-    labNudge('cross.body.shoulderCatch', 0.08);
-    labNudge('cross.body.handSpreadMin', 0.025);
-    labNudge('cross.body.handSpreadMax', 0.035);
-    labNudge('shot.gather.crouch', 0.04);
-  } else if (q === 'ball') {
-    labNudge('cross.ball.crossHang', 0.06);
-    labNudge('cross.ball.crossFloor', -0.02);
-    labNudge('cross.fwd.crossPeak', 0.035);
-    labNudge('cross.fwd.curlPeak', 0.045);
-    labNudge('cross.fwd.behindPeak', -0.035);
-    labNudge('shot.gather.ballFwd', 0.02);
-    labNudge('shot.release.yEnd', 0.035);
-  } else if (q === 'shot') {
-    labNudge('shot.trigger.pullupFwdV', -0.08);
-    labNudge('shot.gather.baseDur', 0.018);
-    labNudge('shot.rise.pullupJump', 0.035);
-    labNudge('shot.rise.pullupStop', -0.055);
-    labNudge('shot.release.fwdStart', 0.015);
-    labNudge('shot.release.fwdEnd', -0.012);
-    labNudge('shot.release.yEnd', 0.045);
-  }
-  sanitizeMech(); labRefreshControls(); labExport(); labStatus('applied ' + q + ' quadrant');
+function labClampPath(path, value) {
+  const ctrl = LAB_CONTROLS.find(c => c[0] === path);
+  return ctrl ? clamp(value, ctrl[2], ctrl[3]) : value;
+}
+function labPadCoords(box, e) {
+  const r = box.getBoundingClientRect();
+  return {
+    x: clamp((e.clientX - r.left) / r.width * 2 - 1, -1, 1),
+    y: clamp((r.bottom - e.clientY) / r.height * 2 - 1, -1, 1)
+  };
+}
+function labSetPadKnob(pad) {
+  if (!pad.knob || !pad.read) return;
+  pad.knob.style.left = ((pad.x + 1) * 50) + '%';
+  pad.knob.style.top = ((1 - pad.y) * 50) + '%';
+  pad.read.textContent = 'x ' + pad.x.toFixed(2) + ' · y ' + pad.y.toFixed(2);
+}
+function labApplyPad(pad, xDelta, yDelta) {
+  pad.ops.forEach(op => {
+    const base = pad.base[op.path];
+    const v = op.axis === 'x' ? xDelta : yDelta;
+    const next = op.scale !== undefined ? base * (1 + op.scale * v) : base + op.delta * v;
+    pathSet(MECH, op.path, labClampPath(op.path, next));
+  });
+  sanitizeMech(); labRefreshControls(); labExport();
+}
+function labMovePad(e) {
+  const pad = LAB.dragPad;
+  if (!pad) return;
+  const p = labPadCoords(pad.box, e);
+  pad.x = p.x; pad.y = p.y;
+  labSetPadKnob(pad);
+  labApplyPad(pad, pad.x - pad.startX, pad.y - pad.startY);
+}
+function labEndPad() {
+  if (!LAB.dragPad) return;
+  labStatus('swept ' + LAB.dragPad.title);
+  LAB.dragPad = null;
+}
+function labBuildPads() {
+  if (LAB.pads.length) return;
+  LAB_PADS.forEach(def => {
+    const wrap = document.createElement('div'); wrap.className = 'labPad';
+    const top = document.createElement('div'); top.className = 'labPadTitle';
+    const title = document.createElement('span'); title.textContent = def.title;
+    const read = document.createElement('span'); read.className = 'labPadRead';
+    top.appendChild(title); top.appendChild(read);
+    const box = document.createElement('div'); box.className = 'labPadBox';
+    const knob = document.createElement('div'); knob.className = 'labPadKnob';
+    [['l', def.xNeg], ['r', def.xPos], ['t', def.yPos], ['b', def.yNeg]].forEach(a => {
+      const d = document.createElement('div'); d.className = 'labAxis ' + a[0]; d.textContent = a[1]; box.appendChild(d);
+    });
+    box.appendChild(knob);
+    wrap.appendChild(top); wrap.appendChild(box);
+    ui.labPads.appendChild(wrap);
+    const pad = { ...def, x: 0, y: 0, startX: 0, startY: 0, base: {}, box, knob, read };
+    LAB.pads.push(pad);
+    labSetPadKnob(pad);
+    box.addEventListener('pointerdown', e => {
+      audioInit();
+      LAB.dragPad = pad;
+      pad.startX = pad.x; pad.startY = pad.y;
+      pad.base = {};
+      pad.ops.forEach(op => { pad.base[op.path] = Number(pathGet(MECH, op.path)); });
+      try { box.setPointerCapture(e.pointerId); } catch (err) {}
+      labMovePad(e);
+    });
+    box.addEventListener('pointermove', labMovePad);
+    box.addEventListener('pointerup', labEndPad);
+    box.addEventListener('pointercancel', labEndPad);
+  });
+}
+function labResetPads() {
+  LAB.pads.forEach(p => { p.x = 0; p.y = 0; labSetPadKnob(p); });
 }
 function labBuildControls() {
   if (LAB.controls.length) { labRefreshControls(); return; }
@@ -2431,15 +2560,40 @@ function labOpen() {
   LAB.open = true;
   ui.helpMenu.classList.remove('show');
   ui.labPanel.classList.add('show');
-  labBuildControls(); labRenderSlots(); labExport();
+  stage.classList.add('labSide');
+  labBuildPads(); labBuildControls(); labRenderSlots(); labExport();
+  if (!LAB.looping) labStartPreview(LAB.preview || 'pullup');
 }
 function labClose() {
   LAB.open = false;
+  labStopPreview();
+  stage.classList.remove('labSide');
   ui.labPanel.classList.remove('show');
 }
-function labTestMove(type) {
+function labPreviewButtons() {
+  [
+    [ui.labTestCross, 'cross'],
+    [ui.labTestCurl, 'curlcross'],
+    [ui.labTestBehind, 'behind'],
+    [ui.labTestPullup, 'pullup']
+  ].forEach(([btn, type]) => btn.classList.toggle('active', LAB.looping && LAB.preview === type));
+}
+function labStartPreview(type) {
   audioInit(); SND.blip();
+  LAB.preview = type;
+  LAB.looping = true;
+  LAB.nextPreviewT = 0;
+  labPreviewButtons();
+  labStatus('looping ' + (type === 'pullup' ? 'pull-up' : type));
+}
+function labStopPreview() {
+  LAB.looping = false;
+  labPreviewButtons();
+}
+function labTestMove(type, quiet) {
+  if (!quiet) { audioInit(); SND.blip(); }
   if (G.phase === 'menu' || G.phase === 'over') G.startGame('free');
+  G.queue.length = 0; Replay.on = false;
   G.phase = 'live'; G.resolved = false; G.pending = null; G.clockRun = false;
   ui.checkPrompt.classList.remove('show');
   oReset(0, 7.9); dReset(0, 6.35);
@@ -2447,11 +2601,11 @@ function labTestMove(type) {
   ball.st = 'dribble'; ball.setPos(0.28, 1.02, 7.56);
   figO.snapTo(O.x, O.z, O.yaw); figD.snapTo(D.x, D.z, D.yaw);
   startMove(type, -1, -1, 0);
-  labStatus('testing ' + type);
 }
-function labTestPullup() {
-  audioInit(); SND.blip();
+function labTestPullup(quiet) {
+  if (!quiet) { audioInit(); SND.blip(); }
   if (G.phase === 'menu' || G.phase === 'over') G.startGame('free');
+  G.queue.length = 0; Replay.on = false;
   G.phase = 'live'; G.resolved = false; G.pending = null; G.clockRun = false;
   ui.checkPrompt.classList.remove('show');
   oReset(0, 7.9); dReset(0, 6.15);
@@ -2460,7 +2614,16 @@ function labTestPullup() {
   ball.st = 'dribble'; ball.setPos(0.28, 1.02, 7.56);
   figO.snapTo(O.x, O.z, O.yaw); figD.snapTo(D.x, D.z, D.yaw);
   tryShoot();
-  labStatus('testing pull-up');
+}
+function labAutoPreview() {
+  if (!LAB.open || !LAB.looping || G.t < LAB.nextPreviewT) return;
+  if (LAB.preview === 'pullup') {
+    labTestPullup(true);
+    LAB.nextPreviewT = G.t + 2.35;
+  } else {
+    labTestMove(LAB.preview, true);
+    LAB.nextPreviewT = G.t + 1.15;
+  }
 }
 
 /* ---------- UI wiring ---------- */
@@ -2492,16 +2655,19 @@ ui.btnLab.addEventListener('click', () => {
   LAB.open ? labClose() : labOpen();
 });
 ui.btnLabClose.addEventListener('click', () => { SND.tick(); labClose(); });
-ui.labTestCross.addEventListener('click', () => labTestMove('cross'));
-ui.labTestCurl.addEventListener('click', () => labTestMove('curlcross'));
-ui.labTestBehind.addEventListener('click', () => labTestMove('behind'));
-ui.labTestPullup.addEventListener('click', () => labTestPullup());
-ui.labQuadrants.addEventListener('click', e => {
-  const b = e.target.closest('button[data-q]');
-  if (b) labApplyQuadrant(b.dataset.q);
+ui.labTestCross.addEventListener('click', () => labStartPreview('cross'));
+ui.labTestCurl.addEventListener('click', () => labStartPreview('curlcross'));
+ui.labTestBehind.addEventListener('click', () => labStartPreview('behind'));
+ui.labTestPullup.addEventListener('click', () => labStartPreview('pullup'));
+ui.labStopLoop.addEventListener('click', () => { SND.tick(); labStopPreview(); labStatus('loop stopped'); });
+ui.labFineToggle.addEventListener('click', () => {
+  SND.tick();
+  LAB.fine = !LAB.fine;
+  ui.labPanel.classList.toggle('fine', LAB.fine);
+  ui.labFineToggle.classList.toggle('active', LAB.fine);
 });
 ui.labReset.addEventListener('click', () => {
-  MECH = cloneData(MECH_DEFAULT); sanitizeMech(); labRefreshControls(); labExport(); labStatus('reset to default');
+  MECH = cloneData(MECH_DEFAULT); sanitizeMech(); labResetPads(); labRefreshControls(); labExport(); labStatus('reset to default');
 });
 ui.labSave.addEventListener('click', () => {
   const a = labArtifact();
@@ -2567,6 +2733,7 @@ function frame(now) {
   let dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
   G.t += dt;
+  labAutoPreview();
 
   if (Replay.on) { replayUpdate(dt); hudUpdate(); return; }
 
