@@ -689,12 +689,20 @@ function makeFigure(bodyCol, accentCol, isDef) {
         const toIdx = (p.moveToHand || -hand) > 0 ? 1 : 0;
         const oldS = fromIdx === 0 ? -1 : 1;
         const newS = toIdx === 0 ? -1 : 1;
-        const carryY = rootY + (moveT < 0.60 ? 0.80 : 0.92);
-        setT(fromIdx, x + rx * oldS * 0.44 + fx * 0.18, carryY, z + rz * oldS * 0.44 + fz * 0.18);
-        setT(toIdx, x + rx * newS * 0.46 + fx * 0.22, rootY + (moveT > 0.50 ? 0.84 : 0.56), z + rz * newS * 0.46 + fz * 0.22);
+        if (moveT < 0.28) {
+          setT(fromIdx, bx - fx * 0.025 + rx * oldS * 0.025, Math.max(rootY + 0.78, by + 0.055), bz - fz * 0.025 + rz * oldS * 0.025);
+          setT(toIdx, x + rx * newS * 0.50 + fx * 0.18, rootY + 0.48, z + rz * newS * 0.50 + fz * 0.18);
+        } else if (moveT > 0.72) {
+          setT(fromIdx, shX + rx * oldS * 0.42 + fx * 0.05, shY + 0.08, shZ + rz * oldS * 0.42 + fz * 0.05);
+          setT(toIdx, bx - fx * 0.025 + rx * newS * 0.025, Math.max(rootY + 0.82, by + 0.055), bz - fz * 0.025 + rz * newS * 0.025);
+        } else {
+          setT(fromIdx, x + rx * oldS * 0.46 + fx * 0.16, rootY + 0.82, z + rz * oldS * 0.46 + fz * 0.16);
+          setT(toIdx, x + rx * newS * 0.50 + fx * 0.24, rootY + 0.50, z + rz * newS * 0.50 + fz * 0.24);
+        }
       } else {
         const raise = hesiPose ? 0.20 : 0;
-        setT(ballIdx, bx, rootY + 0.66 + raise, bz);
+        const handY = Math.max(rootY + 0.62 + raise, Math.min(by + 0.055, rootY + 0.86 + raise));
+        setT(ballIdx, bx - fx * 0.025, handY, bz - fz * 0.025);
         const o = 1 - ballIdx, os = o === 0 ? -1 : 1;
         if (hesiPose) {
           setT(o, shX + fx * 0.18 + rx * os * 0.44, shY + 0.32, shZ + fz * 0.18 + rz * os * 0.44);
@@ -727,7 +735,7 @@ function makeFigure(bodyCol, accentCol, isDef) {
     }
     for (let s = 0; s < 2; s++) {
       const side = s === 0 ? -1 : 1;
-      const rate = (style === STYLE.DRIB && s === ballIdx) ? 34 : 17;
+      const rate = (style === STYLE.DRIB && crossPose) ? 42 : (style === STYLE.DRIB && s === ballIdx) ? 34 : 17;
       hands[s].x = dampN(hands[s].x, tgt[s][0], rate, dt);
       hands[s].y = dampN(hands[s].y, tgt[s][1], rate, dt);
       hands[s].z = dampN(hands[s].z, tgt[s][2], rate, dt);
