@@ -771,19 +771,30 @@ const ball = (function () {
   B.update = function (dt) {
     if (B.st === 'dribble') {
       const hang = O.hang > 0;
-      if (!hang) O.dribPhase += dt / O.dribDur;
+      const crossMove = O.move && (O.move.type === 'cross' || O.move.type === 'curlcross');
+      if (!hang || crossMove) O.dribPhase += dt / O.dribDur;
       const ph = O.dribPhase % 1;
       if (B.prevPhase < 0.5 && ph >= 0.5) { SND.bounce(clamp(0.4 + O.spd * 0.14, 0.4, 1)); O.dribbles++; }
       B.prevPhase = ph;
       const fxv = Math.sin(O.yaw), fzv = Math.cos(O.yaw);
       const rxv = -fzv, rzv = fxv;
-      B.latCur = dampN(B.latCur, O.latTgt, 16, dt);
-      const hx = O.x + rxv * B.latCur * 0.40 + fxv * O.fwdOff;
-      const hz = O.z + rzv * B.latCur * 0.40 + fzv * O.fwdOff;
+      B.latCur = dampN(B.latCur, O.latTgt, crossMove ? 12 : 16, dt);
+      const sweepW = crossMove ? 0.48 : 0.40;
+      const hx = O.x + rxv * B.latCur * sweepW + fxv * O.fwdOff;
+      const hz = O.z + rzv * B.latCur * sweepW + fzv * O.fwdOff;
       const hH = (O.lowT > 0 ? 0.58 : (hang ? 1.16 : 1.02)) - O.crouch * 0.18;
       const yv = BALL_R + (hH - BALL_R) * Math.pow(Math.abs(Math.cos(Math.PI * ph)), 1.22);
       B.x = dampN(B.x, hx, 22, dt); B.z = dampN(B.z, hz, 22, dt);
-      B.y = hang ? hH : yv;
+      let ty = hang ? hH : yv;
+      if (crossMove) {
+        const mt = clamp(O.move.t / O.move.dur, 0, 1);
+        const high = 1.20 - O.crouch * 0.10;
+        const low = BALL_R + 0.09;
+        if (mt < 0.24) ty = high;
+        else if (mt < 0.62) ty = lerp(high, low, smooth(0.24, 0.62, mt));
+        else ty = lerp(low, 1.14 - O.crouch * 0.10, smooth(0.62, 0.88, mt));
+      }
+      B.y = dampN(B.y, ty, crossMove ? 18 : (hang ? 30 : 22), dt);
       B.spin += dt * (2 + O.spd);
     } else if (B.st === 'held') {
       const fxv = Math.sin(O.yaw), fzv = Math.cos(O.yaw);
@@ -1010,12 +1021,12 @@ function startMove(type, dir, wx, wz) {
   const M = { type, t: 0, dur: 0.26, dir, fromHand: O.hand, toHand: O.hand, snapped: false };
   switch (type) {
     case 'cross':
-      M.dur = 0.48; M.toHand = -O.hand; O.lowT = 0.2; O.hang = 0.18;
+      M.dur = 0.52; M.toHand = -O.hand; O.lowT = 0.08; O.hang = 0.22;
       impulse(-rx * dir * 0.55, -rz * dir * 0.55);
       D.event('lat', dir, 0.9); SND.squeak(0.6); chainUp();
       break;
     case 'curlcross':
-      M.dur = 0.50; M.toHand = -O.hand; O.lowT = 0.2; O.hang = 0.16;
+      M.dur = 0.54; M.toHand = -O.hand; O.lowT = 0.08; O.hang = 0.20;
       impulse(rx * dir * 0.55 + fx * 0.75, rz * dir * 0.55 + fz * 0.75);
       D.event('drive', dir, 0.85); SND.squeak(0.75); chainUp(2);
       break;
@@ -1246,7 +1257,7 @@ function offenseUpdate(dt) {
       const M = O.move; M.t += dt;
       if (M.type === 'cross' || M.type === 'curlcross') {
         const t = clamp(M.t / M.dur, 0, 1);
-        const snap = smooth(0.30, 0.78, t);
+        const snap = smooth(0.22, 0.74, t);
         O.latTgt = lerp(M.fromHand, M.toHand, snap);
         if (M.type === 'curlcross') O.fwdOff = lerp(0.02, 0.22, snap);
         if (!M.snapped && t > 0.52) {
