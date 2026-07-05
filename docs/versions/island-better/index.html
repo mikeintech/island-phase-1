@@ -881,11 +881,30 @@ function makeFigure(bodyCol, accentCol, isDef) {
     }
     for (let s = 0; s < 2; s++) {
       const side = s === 0 ? -1 : 1;
+      const sjx = shX + rx * side * P.SHW / 2, sjz = shZ + rz * side * P.SHW / 2;
+      if (style === STYLE.DRIB) {
+        let dx = tgt[s][0] - sjx, dy = tgt[s][1] - shY, dz = tgt[s][2] - sjz;
+        let dl = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const minReach = crossPose ? (s === ballIdx ? 0.655 : 0.625) : (s === ballIdx ? 0.625 : 0.585);
+        const maxReach = P.A1 + P.A2 - 0.012;
+        if (dl < minReach) {
+          const bxv = rx * side * 0.86 - fx * 0.22;
+          const byv = crossPose ? -0.03 : -0.12;
+          const bzv = rz * side * 0.86 - fz * 0.22;
+          dx = dx * 0.45 + bxv * 0.55;
+          dy = dy * 0.45 + byv * 0.55;
+          dz = dz * 0.45 + bzv * 0.55;
+          dl = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+          const reach = Math.min(maxReach, minReach);
+          tgt[s][0] = sjx + dx / dl * reach;
+          tgt[s][1] = shY + dy / dl * reach;
+          tgt[s][2] = sjz + dz / dl * reach;
+        }
+      }
       const rate = (style === STYLE.DRIB && crossPose) ? 42 : (style === STYLE.DRIB && s === ballIdx) ? 34 : 17;
       hands[s].x = dampN(hands[s].x, tgt[s][0], rate, dt);
       hands[s].y = dampN(hands[s].y, tgt[s][1], rate, dt);
       hands[s].z = dampN(hands[s].z, tgt[s][2], rate, dt);
-      const sjx = shX + rx * side * P.SHW / 2, sjz = shZ + rz * side * P.SHW / 2;
       let hxv, hyv, hzv;
       if (style === STYLE.RISE || style === STYLE.FOLLOW) { hxv = -fx * 0.8; hyv = -0.25; hzv = -fz * 0.8; }
       else if (style === STYLE.DRIB && crossPose) { hxv = rx * side * 1.55 - fx * 0.18; hyv = -0.08; hzv = rz * side * 1.55 - fz * 0.18; }
