@@ -610,19 +610,22 @@ function makeFigure(bodyCol, accentCol, isDef) {
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     const rx = -fz, rz = fx;
     const move = p.move || '', moveT = p.moveT || 0, moveDir = p.moveDir || 0;
-    const crossPose = move === 'cross' || move === 'curlcross' || move === 'behind';
+    const prim = p.prim || null;
+    const crossPose = isCrossMove(move);
+    const primPose = crossPose && prim;
     const defPose = isDef && (style === STYLE.DEF || style === STYLE.REACH);
     const hesiPose = move === 'hesi' || (crossPose && moveT > 0.46);
     const hesiSide = hesiPose ? (moveDir || p.hand || 1) : 0;
     const rootY = P.HIP * (1 - crouch * 0.34) + lift;
     const latVel = vx * rx + vz * rz;
-    const bodyFold = crouch * (defPose ? 0.18 : 0.14) + (crossPose && moveT < 0.48 ? 0.08 : 0);
-    const sideLean = rx * (hesiSide * 0.08 + (defPose ? clamp(latVel * 0.075, -0.16, 0.16) : 0));
-    const sideLeanZ = rz * (hesiSide * 0.08 + (defPose ? clamp(latVel * 0.075, -0.16, 0.16) : 0));
+    const bodyFold = crouch * (defPose ? 0.18 : 0.14) + (primPose ? prim.fold : (crossPose && moveT < 0.48 ? 0.08 : 0));
+    const primLean = primPose ? prim.shoulder * 0.13 : 0;
+    const sideLean = rx * (hesiSide * 0.08 + primLean + (defPose ? clamp(latVel * 0.075, -0.16, 0.16) : 0));
+    const sideLeanZ = rz * (hesiSide * 0.08 + primLean + (defPose ? clamp(latVel * 0.075, -0.16, 0.16) : 0));
     const leanX = clamp(vx * 0.045, -0.28, 0.28) + fx * bodyFold + sideLean + (p.leanX || 0);
     const leanZ = clamp(vz * 0.045, -0.28, 0.28) + fz * bodyFold + sideLeanZ + (p.leanZ || 0);
     const shX = x + leanX, shZ = z + leanZ;
-    const waistDrop = crouch * (defPose ? 0.15 : 0.10) + (crossPose && moveT < 0.48 ? 0.07 : 0) + (defPose ? 0.07 : 0);
+    const waistDrop = crouch * (defPose ? 0.15 : 0.10) + (primPose ? prim.waist : (crossPose && moveT < 0.48 ? 0.07 : 0)) + (defPose ? 0.07 : 0);
     const shY = rootY + (P.SH - P.HIP) * (1 - crouch * (defPose ? 0.26 : 0.20)) - waistDrop + (hesiPose ? 0.055 : 0);
     const hdX = shX + leanX * 0.4, hdZ = shZ + leanZ * 0.4;
     const hdY = shY + (P.HEADY - P.SH);
@@ -653,7 +656,7 @@ function makeFigure(bodyCol, accentCol, isDef) {
         const err = hyp(hx - foot.x, hz - foot.z);
         const other = feet[1 - s];
         const pivotHold = (p.pivot !== undefined && p.pivot === s && err < 0.42);
-        const trig = p.plant ? 0.20 : defPose ? 0.11 + spd * 0.045 : 0.17 + spd * 0.105;
+        const trig = (p.plant || (primPose && prim.plant)) ? 0.18 : defPose ? 0.11 + spd * 0.045 : 0.17 + spd * 0.105;
         const emergency = err > 0.45;
         if (!pivotHold && err > trig && (other.t > 0.55 || emergency)) {
           foot.fx = foot.x; foot.fz = foot.z;
@@ -697,15 +700,16 @@ function makeFigure(bodyCol, accentCol, isDef) {
         const toIdx = (p.moveToHand || -hand) > 0 ? 1 : 0;
         const oldS = fromIdx === 0 ? -1 : 1;
         const newS = toIdx === 0 ? -1 : 1;
+        const spread = primPose ? prim.handSpread : 0.64;
         if (moveT < 0.18) {
           setT(fromIdx, bx - fx * 0.02 + rx * oldS * 0.095, by + 0.025, bz - fz * 0.02 + rz * oldS * 0.095);
-          setT(toIdx, x + rx * newS * 0.64 + fx * 0.10, rootY + 0.48, z + rz * newS * 0.64 + fz * 0.10);
+          setT(toIdx, x + rx * newS * spread + fx * 0.10, rootY + 0.48, z + rz * newS * spread + fz * 0.10);
         } else if (moveT > 0.55) {
-          setT(fromIdx, shX + rx * oldS * 0.62 + fx * 0.02, rootY + 0.58, shZ + rz * oldS * 0.62 + fz * 0.02);
+          setT(fromIdx, shX + rx * oldS * (spread * 0.92) + fx * 0.02, rootY + 0.58, shZ + rz * oldS * (spread * 0.92) + fz * 0.02);
           setT(toIdx, bx - fx * 0.02 + rx * newS * 0.095, by + 0.025, bz - fz * 0.02 + rz * newS * 0.095);
         } else {
-          setT(fromIdx, x + rx * oldS * 0.64 + fx * 0.04, rootY + 0.56, z + rz * oldS * 0.64 + fz * 0.04);
-          setT(toIdx, x + rx * newS * 0.66 + fx * 0.08, rootY + 0.48, z + rz * newS * 0.66 + fz * 0.08);
+          setT(fromIdx, x + rx * oldS * spread + fx * 0.04, rootY + 0.54, z + rz * oldS * spread + fz * 0.04);
+          setT(toIdx, x + rx * newS * (spread + 0.02) + fx * 0.08, rootY + 0.46, z + rz * newS * (spread + 0.02) + fz * 0.08);
         }
       } else {
         const raise = hesiPose ? 0.20 : 0;
@@ -800,7 +804,7 @@ const ball = (function () {
   B.update = function (dt) {
     if (B.st === 'dribble') {
       const hang = O.hang > 0;
-      const crossMove = O.move && (O.move.type === 'cross' || O.move.type === 'curlcross' || O.move.type === 'behind');
+      const crossMove = O.move && isCrossMove(O.move.type);
       if (!hang && !crossMove) O.dribPhase += dt / O.dribDur;
       const ph = O.dribPhase % 1;
       if (!crossMove && B.prevPhase < 0.5 && ph >= 0.5) { SND.bounce(clamp(0.4 + O.spd * 0.14, 0.4, 1)); O.dribbles++; }
@@ -809,34 +813,16 @@ const ball = (function () {
       const rxv = -fzv, rzv = fxv;
       if (crossMove) {
         const mt = clamp(O.move.t / O.move.dur, 0, 1);
-        const from = O.move.fromHand, to = O.move.toHand;
-        const behind = O.move.type === 'behind';
-        let lat, fwd, ty;
-        if (mt < 0.14) {
-          const e = smooth(0, 0.14, mt);
-          lat = lerp(from, from * 0.78, e);
-          fwd = behind ? lerp(-0.10, -0.22, e) : lerp(0.16, 0.24, e);
-          ty = lerp(behind ? 0.92 : 1.12, behind ? 1.02 : 1.24, e) - O.crouch * 0.08;
-        } else if (mt < 0.35) {
-          const e = smooth(0.14, 0.35, mt);
-          lat = lerp(from * 0.78, 0, e);
-          fwd = behind ? lerp(-0.22, -0.34, e) : lerp(0.24, 0.32, e);
-          ty = lerp(behind ? 1.02 : 1.24, behind ? 0.62 : BALL_R + 0.035, e);
-        } else {
-          const e = smooth(0.35, 0.66, mt);
-          lat = lerp(0, to * 1.03, e);
-          fwd = behind ? lerp(-0.34, -0.12, e) : lerp(0.32, 0.18, e);
-          ty = lerp(behind ? 0.62 : BALL_R + 0.035, 1.15 - O.crouch * 0.08, e);
-        }
-        if (!O.move.bounced && mt >= 0.34) {
+        const Pm = O.prim || crossPrimitive(O.move, mt);
+        if (!O.move.bounced && Pm.bounceReady) {
           O.move.bounced = true;
           SND.bounce(clamp(0.62 + O.spd * 0.12, 0.62, 1));
           O.dribbles++;
         }
-        B.latCur = lat;
-        B.x = dampN(B.x, O.x + rxv * lat * 0.50 + fxv * fwd, 28, dt);
-        B.z = dampN(B.z, O.z + rzv * lat * 0.50 + fzv * fwd, 28, dt);
-        B.y = dampN(B.y, ty, 30, dt);
+        B.latCur = Pm.lat;
+        B.x = dampN(B.x, O.x + rxv * Pm.lat * 0.50 + fxv * Pm.fwd, 34, dt);
+        B.z = dampN(B.z, O.z + rzv * Pm.lat * 0.50 + fzv * Pm.fwd, 34, dt);
+        B.y = dampN(B.y, Pm.ballY - O.crouch * 0.08, 36, dt);
       } else {
         B.latCur = dampN(B.latCur, O.latTgt, 16, dt);
         const hx = O.x + rxv * B.latCur * 0.40 + fxv * O.fwdOff;
@@ -1039,7 +1025,7 @@ const O = {
   x: 0, z: 7.9, vx: 0, vz: 0, yaw: Math.PI, crouch: 0.34, lift: 0, spd: 0, spdMem: 0,
   st: 'idle', hand: 1, latTgt: 1, lowT: 0, hang: 0,
   dribPhase: 0.2, dribDur: 0.5, fwdOff: 0.24,
-  move: null, windowT: 0, windowType: '', chain: 0, chainT: 0,
+  move: null, prim: null, windowT: 0, windowType: '', chain: 0, chainT: 0,
   dribbles: 0, pickedUp: false, pivot: -1, burstT: 0, hesiArmed: true,
   gT: 0, gDur: 0.2, riseT: 0, riseDur: 0.3, fallT: 0, jumpH: 0.5,
   shotType: 'set', speedAtGather: 0, midMoveAtG: false, crowdedAtG: false, rhythmAtG: 0,
@@ -1048,7 +1034,7 @@ const O = {
 function oReset(x, z) {
   O.x = x; O.z = z; O.vx = 0; O.vz = 0; O.yaw = Math.PI;
   O.st = 'idle'; O.hand = 1; O.latTgt = 1; O.lowT = 0; O.hang = 0;
-  O.dribPhase = 0.2; O.move = null; O.windowT = 0; O.chain = 0;
+  O.dribPhase = 0.2; O.move = null; O.prim = null; O.windowT = 0; O.chain = 0;
   O.dribbles = 0; O.pickedUp = false; O.pivot = -1; O.burstT = 0;
   O.fwdOff = 0.24;
   O.lift = 0; O.followT = 0; O.crouch = 0.34; O.contactCd = 0; O.clampT = 0; O.spdMem = 0;
@@ -1063,6 +1049,51 @@ function laneInfo() {
   const along = dx * fx + dz * fz;
   const laneGap = Math.abs(dx * (-fz) + dz * fx);
   return { fx, fz, along, laneGap, between: clamp(along / Math.min(tl, 2.6), 0, 1) };
+}
+
+function isCrossMove(type) {
+  return type === 'cross' || type === 'curlcross' || type === 'behind';
+}
+
+function crossPrimitive(M, t) {
+  const behind = M.type === 'behind';
+  const curl = M.type === 'curlcross';
+  const load = smooth(0.00, 0.16, t);
+  const drop = smooth(0.14, 0.34, t);
+  const catchT = smooth(0.34, 0.62, t);
+  const exit = smooth(0.50, 0.86, t);
+  let lat, fwd, ballY;
+  if (t < 0.14) {
+    const e = smooth(0, 0.14, t);
+    lat = lerp(M.fromHand, M.fromHand * 0.82, e);
+    fwd = behind ? lerp(-0.10, -0.22, e) : lerp(0.18, curl ? 0.30 : 0.25, e);
+    ballY = lerp(behind ? 0.92 : 1.10, behind ? 1.02 : 1.24, e);
+  } else if (t < 0.34) {
+    const e = smooth(0.14, 0.34, t);
+    lat = lerp(M.fromHand * 0.82, 0, e);
+    fwd = behind ? lerp(-0.22, -0.36, e) : lerp(curl ? 0.30 : 0.25, curl ? 0.40 : 0.34, e);
+    ballY = lerp(behind ? 1.02 : 1.24, behind ? 0.62 : BALL_R + 0.03, e);
+  } else {
+    const e = smooth(0.34, 0.66, t);
+    lat = lerp(0, M.toHand * (curl ? 1.08 : 1.03), e);
+    fwd = behind ? lerp(-0.36, -0.10, e) : lerp(curl ? 0.40 : 0.34, curl ? 0.30 : 0.20, e);
+    ballY = lerp(behind ? 0.62 : BALL_R + 0.03, 1.14, e);
+  }
+  const loadSell = load * (1 - drop);
+  const exitSell = catchT;
+  return {
+    lat, fwd, ballY,
+    crouch: behind ? lerp(0.52, 0.28, exit) : lerp(0.60, 0.20, exit),
+    hang: t < 0.24 ? 0.08 : t > 0.46 ? 0.18 : 0,
+    plant: t > 0.24 && t < 0.62,
+    shoulder: M.dir * (-0.95 * loadSell + 0.85 * exitSell),
+    fold: (1 - exit) * (behind ? 0.06 : 0.11),
+    waist: (1 - exit) * (behind ? 0.04 : 0.08),
+    handSpread: lerp(0.56, 0.70, Math.sin(Math.PI * clamp(t, 0, 1))),
+    snapReady: t > 0.38,
+    bounceReady: t >= 0.32,
+    exit
+  };
 }
 
 function startMove(type, dir, wx, wz) {
@@ -1215,6 +1246,7 @@ function offenseUpdate(dt) {
   const toD = hyp(toX, toZ) || 1;
   const fx = toX / toD, fz = toZ / toD;
   const rx = -fz, rz = fx;
+  O.prim = null;
 
   // consume release / press events
   if (inp.released) {
@@ -1291,7 +1323,7 @@ function offenseUpdate(dt) {
       else if (inp.flickWorld && O.move) {
         const p = O.move.t / O.move.dur;
         const canCancel = (O.move.type === 'hesi' && p > 0.22) ||
-          ((O.move.type === 'cross' || O.move.type === 'curlcross' || O.move.type === 'behind') && p > 0.28) || p > 0.46 ||
+          (isCrossMove(O.move.type) && p > 0.28) || p > 0.46 ||
           O.move.type === 'inout' || (O.move.type === 'between' && p > 0.52) ||
           (O.move.type === 'spin' && p > 0.62);
         if (canCancel) { O.move = null; interpretFlick(inp.flickWorld); }
@@ -1313,23 +1345,26 @@ function offenseUpdate(dt) {
     // move overlay
     if (O.move) {
       const M = O.move; M.t += dt;
-      if (M.type === 'cross' || M.type === 'curlcross' || M.type === 'behind') {
+      if (isCrossMove(M.type)) {
         const t = clamp(M.t / M.dur, 0, 1);
-        const snap = smooth(0.12, 0.52, t);
-        O.latTgt = lerp(M.fromHand, M.toHand, snap);
-        if (M.type === 'curlcross') O.fwdOff = lerp(0.02, 0.22, snap);
-        else if (M.type === 'behind') O.fwdOff = lerp(-0.18, 0.10, snap);
-        if (!M.snapped && t > 0.38) {
+        const Pm = crossPrimitive(M, t);
+        O.prim = Pm;
+        O.latTgt = Pm.lat;
+        O.fwdOff = Pm.fwd;
+        O.hang = Math.max(O.hang, Pm.hang);
+        O.crouch = dampN(O.crouch, Pm.crouch, 18, dt);
+        if (!M.planted && Pm.plant) {
+          M.planted = true;
+          SND.squeak(M.type === 'curlcross' ? 0.45 : 0.32);
+        }
+        if (!M.snapped && Pm.snapReady) {
           M.snapped = true; O.hand = M.toHand;
           const pwr = M.type === 'curlcross' ? 2.65 : M.type === 'behind' ? 1.95 : 2.25;
           impulse(rx * M.dir * pwr + (M.type === 'curlcross' ? fx * 1.45 : 0),
                   rz * M.dir * pwr + (M.type === 'curlcross' ? fz * 1.45 : 0));
         }
-        if (t < 0.36) O.hang = Math.max(O.hang, 0.05);
-        if (t < 0.46) O.crouch = dampN(O.crouch, M.type === 'behind' ? 0.50 : 0.56, 18, dt);
-        if (t > 0.46) {
+        if (Pm.exit > 0.15) {
           O.hang = Math.max(O.hang, 0.18);
-          O.crouch = dampN(O.crouch, 0.18, 14, dt);
           O.windowT = Math.max(O.windowT, 0.25);
           O.windowType = 'hesi';
         }
@@ -1365,7 +1400,7 @@ function offenseUpdate(dt) {
       if (M.type === 'hesi') O.crouch = dampN(O.crouch, 0.12, 14, dt);
       if (M.type === 'stepthrough' && M.t >= M.dur) { O.move = null; tryShoot(); }
       else if (M.t >= M.dur) {
-        if (M.type === 'cross' || M.type === 'curlcross' || M.type === 'behind' || M.type === 'between' || M.type === 'spin') {
+        if (isCrossMove(M.type) || M.type === 'between' || M.type === 'spin') {
           O.hand = M.toHand; O.latTgt = O.hand;
           if (M.type === 'curlcross' || M.type === 'behind' || M.type === 'spin') O.burstT = Math.max(O.burstT, 0.18);
         }
@@ -2045,9 +2080,10 @@ function poseFigures(dt) {
     move: O.move ? O.move.type : '', moveT: O.move ? clamp(O.move.t / O.move.dur, 0, 1) : 0,
     moveDir: O.move ? O.move.dir : 0,
     moveFromHand: O.move ? O.move.fromHand : O.hand, moveToHand: O.move ? O.move.toHand : O.hand,
+    prim: O.prim,
     bx: ball.x, by: ball.y, bz: ball.z,
     pivot: (O.pickedUp && O.st === 'stopped') ? O.pivot : -1,
-    plant: O.windowT > 0 && (O.windowType === 'step' || O.windowType === 'bump')
+    plant: (O.windowT > 0 && (O.windowType === 'step' || O.windowType === 'bump')) || (O.prim && O.prim.plant)
   }, dt);
   figD.pose({
     x: D.x, z: D.z, yaw: D.yaw, crouch: D.crouch, lift: D.lift,
