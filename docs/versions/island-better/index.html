@@ -699,13 +699,13 @@ function makeFigure(bodyCol, accentCol, isDef) {
         const newS = toIdx === 0 ? -1 : 1;
         if (moveT < 0.18) {
           setT(fromIdx, bx - fx * 0.02 + rx * oldS * 0.095, by + 0.025, bz - fz * 0.02 + rz * oldS * 0.095);
-          setT(toIdx, x + rx * newS * 0.50 + fx * 0.18, rootY + 0.48, z + rz * newS * 0.50 + fz * 0.18);
+          setT(toIdx, x + rx * newS * 0.64 + fx * 0.10, rootY + 0.48, z + rz * newS * 0.64 + fz * 0.10);
         } else if (moveT > 0.55) {
-          setT(fromIdx, shX + rx * oldS * 0.42 + fx * 0.05, shY + 0.08, shZ + rz * oldS * 0.42 + fz * 0.05);
+          setT(fromIdx, shX + rx * oldS * 0.62 + fx * 0.02, rootY + 0.58, shZ + rz * oldS * 0.62 + fz * 0.02);
           setT(toIdx, bx - fx * 0.02 + rx * newS * 0.095, by + 0.025, bz - fz * 0.02 + rz * newS * 0.095);
         } else {
-          setT(fromIdx, x + rx * oldS * 0.46 + fx * 0.16, rootY + 0.82, z + rz * oldS * 0.46 + fz * 0.16);
-          setT(toIdx, x + rx * newS * 0.50 + fx * 0.24, rootY + 0.50, z + rz * newS * 0.50 + fz * 0.24);
+          setT(fromIdx, x + rx * oldS * 0.64 + fx * 0.04, rootY + 0.56, z + rz * oldS * 0.64 + fz * 0.04);
+          setT(toIdx, x + rx * newS * 0.66 + fx * 0.08, rootY + 0.48, z + rz * newS * 0.66 + fz * 0.08);
         }
       } else {
         const raise = hesiPose ? 0.20 : 0;
@@ -751,6 +751,7 @@ function makeFigure(bodyCol, accentCol, isDef) {
       const sjx = shX + rx * side * P.SHW / 2, sjz = shZ + rz * side * P.SHW / 2;
       let hxv, hyv, hzv;
       if (style === STYLE.RISE || style === STYLE.FOLLOW) { hxv = -fx * 0.8; hyv = -0.25; hzv = -fz * 0.8; }
+      else if (style === STYLE.DRIB && crossPose) { hxv = rx * side * 1.25 + fx * 0.08; hyv = -0.16; hzv = rz * side * 1.25 + fz * 0.08; }
       else { hxv = rx * side * 0.8 - fx * 0.25; hyv = -0.55; hzv = rz * side * 0.8 - fz * 0.25; }
       ik(sjx, shY, sjz, hands[s].x, hands[s].y, hands[s].z, P.A1, P.A2, hxv, hyv, hzv, IKO);
       seg(F.aU[s], sjx, shY, sjz, IKO.kx, IKO.ky, IKO.kz);
