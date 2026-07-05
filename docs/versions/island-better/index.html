@@ -550,7 +550,7 @@ const SND = {
 /* ---------- stick figure ---------- */
 const P = {
   HIP: 0.99, SH: 1.55, HEADY: 1.77, HEADR: 0.115, SHW: 0.45, HIPW: 0.27,
-  A1: 0.31, A2: 0.30, L1: 0.47, L2: 0.46, STANCE: 0.37
+  A1: 0.34, A2: 0.33, L1: 0.47, L2: 0.46, STANCE: 0.37
 };
 const STYLE = { DRIB: 0, GUARD: 1, GATH: 2, RISE: 3, FOLLOW: 4, DEF: 5, CONTEST: 6, STUMBLE: 7, REACH: 8, HELD: 9 };
 
@@ -563,8 +563,8 @@ function makeFigure(bodyCol, accentCol, isDef) {
     head: mk(new THREE.Mesh(new THREE.SphereGeometry(P.HEADR, 12, 9), mat)),
     torso: cyl(0.105), shBar: cyl(0.055), hipBar: cyl(0.05),
     aU: [cyl(0.046), cyl(0.046)], aF: [cyl(0.04), cyl(0.04)],
-    hand: [mk(new THREE.Mesh(new THREE.SphereGeometry(0.052, 8, 6), mat)),
-           mk(new THREE.Mesh(new THREE.SphereGeometry(0.052, 8, 6), mat))],
+    hand: [mk(new THREE.Mesh(new THREE.SphereGeometry(0.068, 8, 6), mat)),
+           mk(new THREE.Mesh(new THREE.SphereGeometry(0.068, 8, 6), mat))],
     lU: [cyl(0.056), cyl(0.056)], lF: [cyl(0.05), cyl(0.05)],
     foot: [mk(new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.075, 0.28), mat)),
            mk(new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.075, 0.28), mat))]
@@ -690,19 +690,20 @@ function makeFigure(bodyCol, accentCol, isDef) {
         const oldS = fromIdx === 0 ? -1 : 1;
         const newS = toIdx === 0 ? -1 : 1;
         if (moveT < 0.28) {
-          setT(fromIdx, bx - fx * 0.025 + rx * oldS * 0.025, Math.max(rootY + 0.78, by + 0.055), bz - fz * 0.025 + rz * oldS * 0.025);
+          setT(fromIdx, bx - fx * 0.02 + rx * oldS * 0.095, by + 0.025, bz - fz * 0.02 + rz * oldS * 0.095);
           setT(toIdx, x + rx * newS * 0.50 + fx * 0.18, rootY + 0.48, z + rz * newS * 0.50 + fz * 0.18);
         } else if (moveT > 0.72) {
           setT(fromIdx, shX + rx * oldS * 0.42 + fx * 0.05, shY + 0.08, shZ + rz * oldS * 0.42 + fz * 0.05);
-          setT(toIdx, bx - fx * 0.025 + rx * newS * 0.025, Math.max(rootY + 0.82, by + 0.055), bz - fz * 0.025 + rz * newS * 0.025);
+          setT(toIdx, bx - fx * 0.02 + rx * newS * 0.095, by + 0.025, bz - fz * 0.02 + rz * newS * 0.095);
         } else {
           setT(fromIdx, x + rx * oldS * 0.46 + fx * 0.16, rootY + 0.82, z + rz * oldS * 0.46 + fz * 0.16);
           setT(toIdx, x + rx * newS * 0.50 + fx * 0.24, rootY + 0.50, z + rz * newS * 0.50 + fz * 0.24);
         }
       } else {
         const raise = hesiPose ? 0.20 : 0;
-        const handY = Math.max(rootY + 0.62 + raise, Math.min(by + 0.055, rootY + 0.86 + raise));
-        setT(ballIdx, bx - fx * 0.025, handY, bz - fz * 0.025);
+        const handS = ballIdx === 0 ? -1 : 1;
+        const handY = clamp(by + 0.035, rootY + 0.24 + raise * 0.25, rootY + 0.78 + raise);
+        setT(ballIdx, bx - fx * 0.02 + rx * handS * 0.085, handY, bz - fz * 0.02 + rz * handS * 0.085);
         const o = 1 - ballIdx, os = o === 0 ? -1 : 1;
         if (hesiPose) {
           setT(o, shX + fx * 0.18 + rx * os * 0.44, shY + 0.32, shZ + fz * 0.18 + rz * os * 0.44);
