@@ -400,7 +400,7 @@ const MECH_DEFAULT = {
     timing: { loadEnd: 0.14, dropEnd: 0.34, catchEnd: 0.66, exitStart: 0.50, exitEnd: 0.86, snap: 0.38, bounce: 0.32, plantStart: 0.24, plantEnd: 0.62 },
     lat: { loadSide: 0.82, crossCatch: 1.03, curlCatch: 1.08 },
     fwd: { crossStart: 0.18, crossLoad: 0.25, crossPeak: 0.34, crossCatch: 0.20, curlLoad: 0.30, curlPeak: 0.40, curlCatch: 0.30, behindStart: -0.10, behindLoad: -0.22, behindPeak: -0.36, behindCatch: -0.10 },
-    ball: { crossStart: 1.10, crossHang: 1.24, crossFloor: BALL_R + 0.03, crossCatch: 1.14, behindStart: 0.92, behindHang: 1.02, behindFloor: 0.62, behindCatch: 1.14 },
+    ball: { crossStart: 1.10, crossHang: 1.24, crossFloor: 0.32, crossCatch: 1.14, behindStart: 0.92, behindHang: 1.02, behindFloor: 0.62, behindCatch: 1.14 },
     body: { crouchLoad: 0.60, crouchExit: 0.20, behindLoad: 0.52, behindExit: 0.28, shoulderSell: 0.95, shoulderCatch: 0.85, fold: 0.11, waist: 0.08, behindFold: 0.06, behindWaist: 0.04, handSpreadMin: 0.66, handSpreadMax: 0.84 },
     impulse: { crossLoad: 0.55, curlLat: 0.55, curlFwd: 0.75, behindLat: 1.00, behindFwd: 0.35, crossSnap: 2.25, curlSnapLat: 2.65, curlSnapFwd: 1.45, behindSnapLat: 1.95 }
   },
@@ -777,8 +777,17 @@ function makeFigure(bodyCol, accentCol, isDef) {
       if (wasAir) { foot.t = 1; foot.y = 0; foot.x = x + rx * side * P.STANCE / 2; foot.z = z + rz * side * P.STANCE / 2; }
       const lead = clamp((vx * fx + vz * fz) * (defPose ? 0.04 : 0.11), -0.22, 0.30);
       const stanceBoost = defPose ? 0.14 + clamp(spd * 0.035, 0, 0.12) : 0;
-      const hx = x + rx * side * (P.STANCE / 2 + crouch * 0.08 + stanceBoost) + fx * lead + vx * (defPose ? 0.025 : 0.05);
-      const hz = z + rz * side * (P.STANCE / 2 + crouch * 0.08 + stanceBoost) + fz * lead + vz * (defPose ? 0.025 : 0.05);
+      let hx = x + rx * side * (P.STANCE / 2 + crouch * 0.08 + stanceBoost) + fx * lead + vx * (defPose ? 0.025 : 0.05);
+      let hz = z + rz * side * (P.STANCE / 2 + crouch * 0.08 + stanceBoost) + fz * lead + vz * (defPose ? 0.025 : 0.05);
+      if (primPose && !defPose) {
+        const fromS = p.moveFromHand || p.hand || 1;
+        const toS = p.moveToHand || -fromS;
+        const loadStep = smooth(0.03, 0.24, moveT) * (1 - smooth(0.34, 0.50, moveT));
+        const catchStep = smooth(0.34, 0.58, moveT) * (1 - smooth(0.82, 0.98, moveT));
+        const stepPush = (side === fromS ? loadStep : 0) + (side === toS ? catchStep : 0);
+        hx += rx * side * stepPush * 0.25 + fx * catchStep * 0.13;
+        hz += rz * side * stepPush * 0.25 + fz * catchStep * 0.13;
+      }
       if (foot.t < 1) {
         foot.t = Math.min(1, foot.t + dt / foot.dur);
         const e = 1 - (1 - foot.t) * (1 - foot.t);
@@ -834,15 +843,19 @@ function makeFigure(bodyCol, accentCol, isDef) {
         const oldS = fromIdx === 0 ? -1 : 1;
         const newS = toIdx === 0 ? -1 : 1;
         const spread = primPose ? prim.handSpread : 0.64;
-        if (moveT < 0.18) {
-          setT(fromIdx, bx - fx * 0.12 + rx * oldS * 0.18, by + 0.025, bz - fz * 0.12 + rz * oldS * 0.18);
-          setT(toIdx, x + rx * newS * (spread + 0.10) - fx * 0.06, rootY + 0.48, z + rz * newS * (spread + 0.10) - fz * 0.06);
+        const close = smooth(0.10, 0.34, moveT) * (1 - smooth(0.42, 0.62, moveT));
+        const expand = smooth(0.48, 0.86, moveT);
+        if (moveT < 0.28) {
+          setT(fromIdx, bx - fx * 0.10 + rx * oldS * 0.12, by + 0.035, bz - fz * 0.10 + rz * oldS * 0.12);
+          setT(toIdx, shX + rx * newS * lerp(0.16, 0.08, close) - fx * 0.02, rootY + 0.42, shZ + rz * newS * lerp(0.16, 0.08, close) - fz * 0.02);
         } else if (moveT > 0.55) {
-          setT(fromIdx, shX + rx * oldS * (spread + 0.06) - fx * 0.10, rootY + 0.58, shZ + rz * oldS * (spread + 0.06) - fz * 0.10);
-          setT(toIdx, bx - fx * 0.12 + rx * newS * 0.18, by + 0.025, bz - fz * 0.12 + rz * newS * 0.18);
+          const flare = lerp(0.26, spread + 0.08, expand);
+          setT(fromIdx, shX + rx * oldS * flare - fx * 0.10, rootY + 0.52 + expand * 0.07, shZ + rz * oldS * flare - fz * 0.10);
+          setT(toIdx, bx - fx * 0.10 + rx * newS * 0.14, by + 0.035, bz - fz * 0.10 + rz * newS * 0.14);
         } else {
-          setT(fromIdx, x + rx * oldS * (spread + 0.10) - fx * 0.08, rootY + 0.54, z + rz * oldS * (spread + 0.10) - fz * 0.08);
-          setT(toIdx, x + rx * newS * (spread + 0.12) - fx * 0.06, rootY + 0.46, z + rz * newS * (spread + 0.12) - fz * 0.06);
+          const pinch = lerp(0.16, 0.28, 1 - close);
+          setT(fromIdx, x + rx * oldS * pinch - fx * 0.03, rootY + 0.45, z + rz * oldS * pinch - fz * 0.03);
+          setT(toIdx, x + rx * newS * pinch - fx * 0.01, rootY + 0.41, z + rz * newS * pinch - fz * 0.01);
         }
       } else {
         const raise = hesiPose ? 0.20 : 0;
@@ -885,7 +898,9 @@ function makeFigure(bodyCol, accentCol, isDef) {
       if (style === STYLE.DRIB) {
         let dx = tgt[s][0] - sjx, dy = tgt[s][1] - shY, dz = tgt[s][2] - sjz;
         let dl = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        const minReach = crossPose ? (s === ballIdx ? 0.655 : 0.625) : (s === ballIdx ? 0.625 : 0.585);
+        const crossExtend = crossPose ? smooth(0.48, 0.86, moveT) : 1;
+        const crossMin = crossPose ? lerp(0.44, s === ballIdx ? 0.665 : 0.625, crossExtend) : 0;
+        const minReach = crossPose ? crossMin : (s === ballIdx ? 0.625 : 0.585);
         const maxReach = P.A1 + P.A2 - 0.012;
         if (dl < minReach) {
           const bxv = rx * side * 0.86 - fx * 0.22;
@@ -975,7 +990,7 @@ const ball = (function () {
         B.latCur = Pm.lat;
         B.x = dampN(B.x, O.x + rxv * Pm.lat * 0.58 + fxv * (Pm.fwd - 0.16), 34, dt);
         B.z = dampN(B.z, O.z + rzv * Pm.lat * 0.58 + fzv * (Pm.fwd - 0.16), 34, dt);
-        B.y = dampN(B.y, Pm.ballY - O.crouch * 0.08, 36, dt);
+        B.y = dampN(B.y, Pm.ballY - O.crouch * 0.035, 36, dt);
       } else {
         B.latCur = dampN(B.latCur, O.latTgt, 16, dt);
         const hx = O.x + rxv * B.latCur * 0.54 + fxv * (O.fwdOff - 0.16);
