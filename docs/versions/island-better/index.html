@@ -128,6 +128,9 @@
   .labTitle{font-size:13px;font-weight:900;letter-spacing:.22em;color:var(--gold)}
   .labSub{font-size:9px;letter-spacing:.16em;color:var(--dim);line-height:1.5;margin-bottom:10px;text-transform:uppercase}
   .labGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .labQuadrants{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:9px 0}
+  .labQuadrants button{min-height:58px;padding:8px;border-color:var(--dim2);font-size:9px;line-height:1.35;text-align:left}
+  .labQuadrants b{display:block;color:var(--gold);font-size:10px;margin-bottom:3px}
   .labActions{display:flex;gap:7px;flex-wrap:wrap;margin:9px 0}
   .labActions button,#labPanel .labTop button{font-size:9px;padding:7px 9px;letter-spacing:.12em}
   .labSection{border-top:1px solid var(--dim2);padding-top:10px;margin-top:10px}
@@ -198,7 +201,17 @@
       <button id="labTestCross">TEST CROSS</button>
       <button id="labTestCurl">TEST CURL</button>
       <button id="labTestBehind">TEST BEHIND</button>
+      <button id="labTestPullup">TEST PULL-UP</button>
       <button id="labReset">RESET</button>
+    </div>
+    <div class="labSection">
+      <div class="labSub">4-quadrant sweep grid</div>
+      <div class="labQuadrants" id="labQuadrants">
+        <button data-q="timing"><b>Q1 TIMING</b>faster load, earlier snap, quicker rise</button>
+        <button data-q="body"><b>Q2 BODY</b>lower hips, stronger shoulder sell, wider arms</button>
+        <button data-q="ball"><b>Q3 BALL</b>higher hang, lower bounce, bigger sweep</button>
+        <button data-q="shot"><b>Q4 PULL-UP</b>cleaner gather, higher release, harder stop</button>
+      </div>
     </div>
     <div id="labControls" class="labSection"></div>
     <div class="labSection">
@@ -328,6 +341,7 @@ const ui = {
   labTitleInput: $('labTitleInput'), labAuthorInput: $('labAuthorInput'), labNotes: $('labNotes'),
   labControls: $('labControls'), labSlots: $('labSlots'), labJson: $('labJson'), labMsg: $('labMsg'),
   labTestCross: $('labTestCross'), labTestCurl: $('labTestCurl'), labTestBehind: $('labTestBehind'),
+  labTestPullup: $('labTestPullup'), labQuadrants: $('labQuadrants'),
   labReset: $('labReset'), labSave: $('labSave'), labLoad: $('labLoad'), labDelete: $('labDelete'),
   labExport: $('labExport'), labImport: $('labImport'), labCopy: $('labCopy'),
   menu: $('menu'), end: $('end'), endTitle: $('endTitle'), endSub: $('endSub'),
@@ -359,6 +373,12 @@ const MECH_DEFAULT = {
     ball: { crossStart: 1.10, crossHang: 1.24, crossFloor: BALL_R + 0.03, crossCatch: 1.14, behindStart: 0.92, behindHang: 1.02, behindFloor: 0.62, behindCatch: 1.14 },
     body: { crouchLoad: 0.60, crouchExit: 0.20, behindLoad: 0.52, behindExit: 0.28, shoulderSell: 0.95, shoulderCatch: 0.85, fold: 0.11, waist: 0.08, behindFold: 0.06, behindWaist: 0.04, handSpreadMin: 0.56, handSpreadMax: 0.70 },
     impulse: { crossLoad: 0.55, curlLat: 0.55, curlFwd: 0.75, behindLat: 1.00, behindFwd: 0.35, crossSnap: 2.25, curlSnapLat: 2.65, curlSnapFwd: 1.45, behindSnapLat: 1.95 }
+  },
+  shot: {
+    trigger: { pullupFwdV: 1.40, pullupMinDist: 2.40, fadeBackV: -1.00, driveDist: 2.40 },
+    gather: { baseDur: 0.20, speedAdd: 0.05, crouch: 0.55, ballFwd: 0.24, ballY: 0.42, fakeDur: 0.30, fakeLift: 0.42 },
+    rise: { dur: 0.30, setJump: 0.52, pullupJump: 0.47, fadeJump: 0.42, driveJump: 0.44, pullupStop: 0.35, fadeBack: 1.10, driveStop: 0.50 },
+    release: { fwdStart: 0.24, fwdEnd: 0.16, yStart: 0.42, yEnd: 0.92, followCrouch: 0.12 }
   }
 };
 const cloneData = o => JSON.parse(JSON.stringify(o));
@@ -1289,10 +1309,11 @@ function interpretFlick(f) {
 function tryShoot() {
   if (!(O.st === 'idle' || O.st === 'dribble' || O.st === 'stopped' || O.st === 'fake')) return;
   if (G.phase !== 'live') return;
+  const SG = MECH.shot.gather;
   O.st = 'gather';
   O.gT = 0;
   O.speedAtGather = O.spd;
-  O.gDur = 0.20 + (O.spd > 3 ? 0.05 : 0);
+  O.gDur = SG.baseDur + (O.spd > 3 ? SG.speedAdd : 0);
   O.midMoveAtG = !!O.move && O.move.type !== 'burst';
   O.crowdedAtG = hyp(D.x - O.x, D.z - O.z) < 0.95;
   const ph = O.dribPhase % 1;
@@ -1307,21 +1328,22 @@ function startFake() {
   SND.whoosh();
 }
 function beginRise() {
+  const S = MECH.shot;
   const toDist = hyp(RIM.x - O.x, RIM.z - O.z);
   const toX = (RIM.x - O.x), toZ = (RIM.z - O.z);
   const tl = toDist || 1;
   const fwdV = (O.vx * toX + O.vz * toZ) / tl;
   if (O.windowT > 0 && O.windowType === 'step') O.shotType = 'fade';
-  else if (fwdV < -1.0) O.shotType = 'fade';
-  else if (fwdV > 1.4 && toDist > 2.4) O.shotType = 'pullup';
-  else if (toDist <= 2.4) O.shotType = 'drive';
+  else if (fwdV < S.trigger.fadeBackV) O.shotType = 'fade';
+  else if (fwdV > S.trigger.pullupFwdV && toDist > S.trigger.pullupMinDist) O.shotType = 'pullup';
+  else if (toDist <= S.trigger.driveDist) O.shotType = 'drive';
   else O.shotType = 'set';
-  O.jumpH = { set: 0.52, pullup: 0.47, fade: 0.42, drive: 0.44 }[O.shotType];
-  O.riseT = 0; O.riseDur = 0.3;
+  O.jumpH = { set: S.rise.setJump, pullup: S.rise.pullupJump, fade: S.rise.fadeJump, drive: S.rise.driveJump }[O.shotType];
+  O.riseT = 0; O.riseDur = S.rise.dur;
   O.st = 'rise';
-  if (O.shotType === 'pullup') { O.vx *= 0.35; O.vz *= 0.35; }
-  else if (O.shotType === 'fade') { O.vx = -toX / tl * 1.1; O.vz = -toZ / tl * 1.1; }
-  else if (O.shotType === 'drive') { O.vx *= 0.5; O.vz *= 0.5; }
+  if (O.shotType === 'pullup') { O.vx *= S.rise.pullupStop; O.vz *= S.rise.pullupStop; }
+  else if (O.shotType === 'fade') { O.vx = -toX / tl * S.rise.fadeBack; O.vz = -toZ / tl * S.rise.fadeBack; }
+  else if (O.shotType === 'drive') { O.vx *= S.rise.driveStop; O.vz *= S.rise.driveStop; }
   else { O.vx = 0; O.vz = 0; }
 }
 
@@ -1348,22 +1370,25 @@ function offenseUpdate(dt) {
 
   /* state machine */
   if (O.st === 'gather') {
+    const SG = MECH.shot.gather;
     O.gT += dt;
     const t = clamp(O.gT / O.gDur, 0, 1);
-    O.crouch = dampN(O.crouch, 0.55, 16, dt);
+    O.crouch = dampN(O.crouch, SG.crouch, 16, dt);
     const rootY = P.HIP * (1 - O.crouch * 0.34);
-    const cx = O.x + fx * 0.24, cy = rootY + 0.42, cz = O.z + fz * 0.24;
+    const cx = O.x + fx * SG.ballFwd, cy = rootY + SG.ballY, cz = O.z + fz * SG.ballFwd;
     ball.setPos(lerp(O.gFromX, cx, t), lerp(O.gFromY, cy, t), lerp(O.gFromZ, cz, t));
     if (t >= 1) beginRise();
   } else if (O.st === 'rise') {
+    const SR = MECH.shot.release;
     O.riseT += dt;
     const t = clamp(O.riseT / O.riseDur, 0, 1);
     O.lift = O.jumpH * Math.sin(t * Math.PI / 2);
-    O.crouch = dampN(O.crouch, 0.12, 14, dt);
+    O.crouch = dampN(O.crouch, SR.followCrouch, 14, dt);
     O.x += O.vx * dt; O.z += O.vz * dt;
     const rootY = P.HIP * (1 - O.crouch * 0.34) + O.lift;
-    const cy0 = rootY + 0.42, cy1 = rootY + 0.92;
-    ball.setPos(O.x + fx * lerp(0.24, 0.16, t), lerp(cy0, cy1, t), O.z + fz * lerp(0.24, 0.16, t));
+    const cy0 = rootY + SR.yStart, cy1 = rootY + SR.yEnd;
+    const fwd = lerp(SR.fwdStart, SR.fwdEnd, t);
+    ball.setPos(O.x + fx * fwd, lerp(cy0, cy1, t), O.z + fz * fwd);
     if (t >= 1) releaseBall();
   } else if (O.st === 'fall') {
     O.fallT += dt;
@@ -1373,11 +1398,12 @@ function offenseUpdate(dt) {
     O.followT += dt;
     if (t >= 1) { O.lift = 0; O.st = 'recover'; SND.squeak(0.3); }
   } else if (O.st === 'fake') {
+    const SG = MECH.shot.gather;
     O.fakeT += dt;
-    const t = clamp(O.fakeT / 0.30, 0, 1);
+    const t = clamp(O.fakeT / SG.fakeDur, 0, 1);
     const rootY = P.HIP * (1 - O.crouch * 0.34);
     const up = Math.sin(t * Math.PI);
-    ball.setPos(O.x + fx * 0.24, rootY + 0.42 + up * 0.42, O.z + fz * 0.24);
+    ball.setPos(O.x + fx * SG.ballFwd, rootY + SG.ballY + up * SG.fakeLift, O.z + fz * SG.ballFwd);
     O.crouch = dampN(O.crouch, 0.3 + (1 - up) * 0.2, 12, dt);
     if (t >= 1) {
       if (O.pickedUp) { O.st = 'stopped'; ball.st = 'held'; }
@@ -2216,7 +2242,19 @@ const LAB_CONTROLS = [
   ['cross.impulse.crossSnap', 'cross burst', 0.80, 3.80, 0.05],
   ['cross.impulse.curlSnapLat', 'curl side burst', 0.80, 4.20, 0.05],
   ['cross.impulse.curlSnapFwd', 'curl drive burst', 0.20, 2.40, 0.05],
-  ['cross.impulse.behindSnapLat', 'behind burst', 0.60, 3.60, 0.05]
+  ['cross.impulse.behindSnapLat', 'behind burst', 0.60, 3.60, 0.05],
+  ['shot.trigger.pullupFwdV', 'pull-up trigger', 0.70, 2.40, 0.05],
+  ['shot.gather.baseDur', 'gather time', 0.12, 0.42, 0.01],
+  ['shot.gather.crouch', 'gather crouch', 0.30, 0.78, 0.01],
+  ['shot.gather.ballFwd', 'gather forward', 0.10, 0.44, 0.01],
+  ['shot.gather.ballY', 'gather ball y', 0.26, 0.72, 0.01],
+  ['shot.rise.dur', 'rise time', 0.18, 0.50, 0.01],
+  ['shot.rise.pullupJump', 'pull-up jump', 0.25, 0.72, 0.01],
+  ['shot.rise.pullupStop', 'pull-up stop', 0.10, 0.75, 0.01],
+  ['shot.release.fwdStart', 'release start fwd', 0.08, 0.42, 0.01],
+  ['shot.release.fwdEnd', 'release end fwd', 0.04, 0.32, 0.01],
+  ['shot.release.yEnd', 'release height', 0.70, 1.22, 0.01],
+  ['shot.release.followCrouch', 'follow crouch', 0.04, 0.28, 0.01]
 ];
 function pathGet(o, path) {
   return path.split('.').reduce((a, k) => a && a[k], o);
@@ -2237,6 +2275,7 @@ function mergeMechanics(base, patch) {
 }
 function sanitizeMech() {
   const T = MECH.cross.timing, B = MECH.cross.body, ballCfg = MECH.cross.ball;
+  const ST = MECH.shot.trigger, SG = MECH.shot.gather, SR = MECH.shot.rise, SL = MECH.shot.release;
   T.loadEnd = clamp(T.loadEnd, 0.05, 0.25);
   T.dropEnd = clamp(Math.max(T.dropEnd, T.loadEnd + 0.06), 0.18, 0.52);
   T.catchEnd = clamp(Math.max(T.catchEnd, T.dropEnd + 0.08), 0.36, 0.86);
@@ -2248,6 +2287,24 @@ function sanitizeMech() {
   T.plantEnd = clamp(Math.max(T.plantEnd, T.plantStart + 0.04), 0.20, 0.88);
   B.handSpreadMax = Math.max(B.handSpreadMax, B.handSpreadMin + 0.02);
   ballCfg.crossFloor = clamp(ballCfg.crossFloor, BALL_R + 0.005, 0.45);
+  ST.pullupFwdV = clamp(ST.pullupFwdV, 0.55, 2.6);
+  ST.pullupMinDist = clamp(ST.pullupMinDist, 1.6, 4.5);
+  ST.fadeBackV = clamp(ST.fadeBackV, -2.0, -0.2);
+  ST.driveDist = clamp(ST.driveDist, 1.4, 3.6);
+  SG.baseDur = clamp(SG.baseDur, 0.10, 0.46);
+  SG.speedAdd = clamp(SG.speedAdd, 0, 0.18);
+  SG.crouch = clamp(SG.crouch, 0.20, 0.85);
+  SG.ballFwd = clamp(SG.ballFwd, 0.06, 0.52);
+  SG.ballY = clamp(SG.ballY, 0.22, 0.82);
+  SG.fakeDur = clamp(SG.fakeDur, 0.14, 0.52);
+  SG.fakeLift = clamp(SG.fakeLift, 0.18, 0.72);
+  SR.dur = clamp(SR.dur, 0.14, 0.56);
+  SR.pullupJump = clamp(SR.pullupJump, 0.18, 0.80);
+  SR.pullupStop = clamp(SR.pullupStop, 0.04, 0.85);
+  SR.fadeBack = clamp(SR.fadeBack, 0.3, 2.2);
+  SL.fwdStart = clamp(SL.fwdStart, 0.04, 0.52);
+  SL.fwdEnd = clamp(SL.fwdEnd, 0.02, 0.40);
+  SL.yEnd = clamp(SL.yEnd, Math.max(SL.yStart + 0.22, 0.64), 1.32);
 }
 function labSaved() {
   try { return JSON.parse(localStorage.getItem(LAB_STORE) || '[]') || []; }
@@ -2289,13 +2346,58 @@ function labRefreshControls() {
     c.range.value = v; c.num.value = v;
   });
 }
+function labNudge(path, delta) {
+  const ctrl = LAB_CONTROLS.find(c => c[0] === path);
+  const min = ctrl ? ctrl[2] : -999, max = ctrl ? ctrl[3] : 999;
+  pathSet(MECH, path, clamp(Number(pathGet(MECH, path)) + delta, min, max));
+}
+function labScale(path, scale) {
+  const ctrl = LAB_CONTROLS.find(c => c[0] === path);
+  const min = ctrl ? ctrl[2] : -999, max = ctrl ? ctrl[3] : 999;
+  pathSet(MECH, path, clamp(Number(pathGet(MECH, path)) * scale, min, max));
+}
+function labApplyQuadrant(q) {
+  if (q === 'timing') {
+    ['cross.dur.cross', 'cross.dur.curlcross', 'cross.dur.behind', 'shot.gather.baseDur', 'shot.rise.dur'].forEach(p => labScale(p, 0.92));
+    ['cross.timing.loadEnd', 'cross.timing.dropEnd', 'cross.timing.catchEnd', 'cross.timing.snap', 'cross.timing.bounce'].forEach(p => labNudge(p, -0.015));
+  } else if (q === 'body') {
+    labNudge('cross.body.crouchLoad', 0.05);
+    labNudge('cross.body.shoulderSell', 0.10);
+    labNudge('cross.body.shoulderCatch', 0.08);
+    labNudge('cross.body.handSpreadMin', 0.025);
+    labNudge('cross.body.handSpreadMax', 0.035);
+    labNudge('shot.gather.crouch', 0.04);
+  } else if (q === 'ball') {
+    labNudge('cross.ball.crossHang', 0.06);
+    labNudge('cross.ball.crossFloor', -0.02);
+    labNudge('cross.fwd.crossPeak', 0.035);
+    labNudge('cross.fwd.curlPeak', 0.045);
+    labNudge('cross.fwd.behindPeak', -0.035);
+    labNudge('shot.gather.ballFwd', 0.02);
+    labNudge('shot.release.yEnd', 0.035);
+  } else if (q === 'shot') {
+    labNudge('shot.trigger.pullupFwdV', -0.08);
+    labNudge('shot.gather.baseDur', 0.018);
+    labNudge('shot.rise.pullupJump', 0.035);
+    labNudge('shot.rise.pullupStop', -0.055);
+    labNudge('shot.release.fwdStart', 0.015);
+    labNudge('shot.release.fwdEnd', -0.012);
+    labNudge('shot.release.yEnd', 0.045);
+  }
+  sanitizeMech(); labRefreshControls(); labExport(); labStatus('applied ' + q + ' quadrant');
+}
 function labBuildControls() {
   if (LAB.controls.length) { labRefreshControls(); return; }
-  const title = document.createElement('div');
-  title.className = 'labSub';
-  title.textContent = 'cross-family motion primitive';
-  ui.labControls.appendChild(title);
+  let group = '';
   LAB_CONTROLS.forEach(([path, label, min, max, step]) => {
+    const nextGroup = path.split('.')[0];
+    if (nextGroup !== group) {
+      group = nextGroup;
+      const title = document.createElement('div');
+      title.className = 'labSub';
+      title.textContent = group === 'shot' ? 'pull-up shot primitive' : 'cross-family motion primitive';
+      ui.labControls.appendChild(title);
+    }
     const row = document.createElement('div'); row.className = 'labRow';
     const l = document.createElement('label'); l.textContent = label;
     const range = document.createElement('input'); range.type = 'range'; range.min = min; range.max = max; range.step = step;
@@ -2347,6 +2449,19 @@ function labTestMove(type) {
   startMove(type, -1, -1, 0);
   labStatus('testing ' + type);
 }
+function labTestPullup() {
+  audioInit(); SND.blip();
+  if (G.phase === 'menu' || G.phase === 'over') G.startGame('free');
+  G.phase = 'live'; G.resolved = false; G.pending = null; G.clockRun = false;
+  ui.checkPrompt.classList.remove('show');
+  oReset(0, 7.9); dReset(0, 6.15);
+  O.st = 'dribble'; O.hand = 1; O.latTgt = 1; O.dribPhase = 0.12;
+  O.vx = 0; O.vz = -3.15; O.spd = 3.15; O.spdMem = 3.15;
+  ball.st = 'dribble'; ball.setPos(0.28, 1.02, 7.56);
+  figO.snapTo(O.x, O.z, O.yaw); figD.snapTo(D.x, D.z, D.yaw);
+  tryShoot();
+  labStatus('testing pull-up');
+}
 
 /* ---------- UI wiring ---------- */
 function setDiff(k) {
@@ -2380,6 +2495,11 @@ ui.btnLabClose.addEventListener('click', () => { SND.tick(); labClose(); });
 ui.labTestCross.addEventListener('click', () => labTestMove('cross'));
 ui.labTestCurl.addEventListener('click', () => labTestMove('curlcross'));
 ui.labTestBehind.addEventListener('click', () => labTestMove('behind'));
+ui.labTestPullup.addEventListener('click', () => labTestPullup());
+ui.labQuadrants.addEventListener('click', e => {
+  const b = e.target.closest('button[data-q]');
+  if (b) labApplyQuadrant(b.dataset.q);
+});
 ui.labReset.addEventListener('click', () => {
   MECH = cloneData(MECH_DEFAULT); sanitizeMech(); labRefreshControls(); labExport(); labStatus('reset to default');
 });
