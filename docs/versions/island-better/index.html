@@ -401,7 +401,7 @@ const MECH_DEFAULT = {
     lat: { loadSide: 0.82, crossCatch: 1.03, curlCatch: 1.08 },
     fwd: { crossStart: 0.18, crossLoad: 0.25, crossPeak: 0.34, crossCatch: 0.20, curlLoad: 0.30, curlPeak: 0.40, curlCatch: 0.30, behindStart: -0.10, behindLoad: -0.22, behindPeak: -0.36, behindCatch: -0.10 },
     ball: { crossStart: 1.10, crossHang: 1.24, crossFloor: BALL_R + 0.03, crossCatch: 1.14, behindStart: 0.92, behindHang: 1.02, behindFloor: 0.62, behindCatch: 1.14 },
-    body: { crouchLoad: 0.60, crouchExit: 0.20, behindLoad: 0.52, behindExit: 0.28, shoulderSell: 0.95, shoulderCatch: 0.85, fold: 0.11, waist: 0.08, behindFold: 0.06, behindWaist: 0.04, handSpreadMin: 0.56, handSpreadMax: 0.70 },
+    body: { crouchLoad: 0.60, crouchExit: 0.20, behindLoad: 0.52, behindExit: 0.28, shoulderSell: 0.95, shoulderCatch: 0.85, fold: 0.11, waist: 0.08, behindFold: 0.06, behindWaist: 0.04, handSpreadMin: 0.66, handSpreadMax: 0.84 },
     impulse: { crossLoad: 0.55, curlLat: 0.55, curlFwd: 0.75, behindLat: 1.00, behindFwd: 0.35, crossSnap: 2.25, curlSnapLat: 2.65, curlSnapFwd: 1.45, behindSnapLat: 1.95 }
   },
   shot: {
@@ -835,25 +835,25 @@ function makeFigure(bodyCol, accentCol, isDef) {
         const newS = toIdx === 0 ? -1 : 1;
         const spread = primPose ? prim.handSpread : 0.64;
         if (moveT < 0.18) {
-          setT(fromIdx, bx - fx * 0.02 + rx * oldS * 0.095, by + 0.025, bz - fz * 0.02 + rz * oldS * 0.095);
-          setT(toIdx, x + rx * newS * spread + fx * 0.10, rootY + 0.48, z + rz * newS * spread + fz * 0.10);
+          setT(fromIdx, bx - fx * 0.12 + rx * oldS * 0.18, by + 0.025, bz - fz * 0.12 + rz * oldS * 0.18);
+          setT(toIdx, x + rx * newS * (spread + 0.10) - fx * 0.06, rootY + 0.48, z + rz * newS * (spread + 0.10) - fz * 0.06);
         } else if (moveT > 0.55) {
-          setT(fromIdx, shX + rx * oldS * (spread * 0.92) + fx * 0.02, rootY + 0.58, shZ + rz * oldS * (spread * 0.92) + fz * 0.02);
-          setT(toIdx, bx - fx * 0.02 + rx * newS * 0.095, by + 0.025, bz - fz * 0.02 + rz * newS * 0.095);
+          setT(fromIdx, shX + rx * oldS * (spread + 0.06) - fx * 0.10, rootY + 0.58, shZ + rz * oldS * (spread + 0.06) - fz * 0.10);
+          setT(toIdx, bx - fx * 0.12 + rx * newS * 0.18, by + 0.025, bz - fz * 0.12 + rz * newS * 0.18);
         } else {
-          setT(fromIdx, x + rx * oldS * spread + fx * 0.04, rootY + 0.54, z + rz * oldS * spread + fz * 0.04);
-          setT(toIdx, x + rx * newS * (spread + 0.02) + fx * 0.08, rootY + 0.46, z + rz * newS * (spread + 0.02) + fz * 0.08);
+          setT(fromIdx, x + rx * oldS * (spread + 0.10) - fx * 0.08, rootY + 0.54, z + rz * oldS * (spread + 0.10) - fz * 0.08);
+          setT(toIdx, x + rx * newS * (spread + 0.12) - fx * 0.06, rootY + 0.46, z + rz * newS * (spread + 0.12) - fz * 0.06);
         }
       } else {
         const raise = hesiPose ? 0.20 : 0;
         const handS = ballIdx === 0 ? -1 : 1;
         const handY = clamp(by + 0.035, rootY + 0.24 + raise * 0.25, rootY + 0.78 + raise);
-        setT(ballIdx, bx - fx * 0.02 + rx * handS * 0.085, handY, bz - fz * 0.02 + rz * handS * 0.085);
+        setT(ballIdx, bx - fx * 0.12 + rx * handS * 0.18, handY, bz - fz * 0.12 + rz * handS * 0.18);
         const o = 1 - ballIdx, os = o === 0 ? -1 : 1;
         if (hesiPose) {
-          setT(o, shX + fx * 0.18 + rx * os * 0.44, shY + 0.32, shZ + fz * 0.18 + rz * os * 0.44);
+          setT(o, shX - fx * 0.02 + rx * os * 0.56, shY + 0.32, shZ - fz * 0.02 + rz * os * 0.56);
         } else {
-          setT(o, x + fx * 0.26 + rx * os * 0.32, rootY + 0.30, z + fz * 0.26 + rz * os * 0.32);
+          setT(o, x - fx * 0.02 + rx * os * 0.44, rootY + 0.30, z - fz * 0.02 + rz * os * 0.44);
         }
       }
     } else if (style === STYLE.HELD || style === STYLE.GATH || style === STYLE.RISE) {
@@ -888,7 +888,8 @@ function makeFigure(bodyCol, accentCol, isDef) {
       const sjx = shX + rx * side * P.SHW / 2, sjz = shZ + rz * side * P.SHW / 2;
       let hxv, hyv, hzv;
       if (style === STYLE.RISE || style === STYLE.FOLLOW) { hxv = -fx * 0.8; hyv = -0.25; hzv = -fz * 0.8; }
-      else if (style === STYLE.DRIB && crossPose) { hxv = rx * side * 1.25 + fx * 0.08; hyv = -0.16; hzv = rz * side * 1.25 + fz * 0.08; }
+      else if (style === STYLE.DRIB && crossPose) { hxv = rx * side * 1.55 - fx * 0.18; hyv = -0.08; hzv = rz * side * 1.55 - fz * 0.18; }
+      else if (style === STYLE.DRIB) { hxv = rx * side * 1.20 - fx * 0.18; hyv = -0.20; hzv = rz * side * 1.20 - fz * 0.18; }
       else { hxv = rx * side * 0.8 - fx * 0.25; hyv = -0.55; hzv = rz * side * 0.8 - fz * 0.25; }
       ik(sjx, shY, sjz, hands[s].x, hands[s].y, hands[s].z, P.A1, P.A2, hxv, hyv, hzv, IKO);
       seg(F.aU[s], sjx, shY, sjz, IKO.kx, IKO.ky, IKO.kz);
@@ -953,13 +954,13 @@ const ball = (function () {
           O.dribbles++;
         }
         B.latCur = Pm.lat;
-        B.x = dampN(B.x, O.x + rxv * Pm.lat * 0.50 + fxv * Pm.fwd, 34, dt);
-        B.z = dampN(B.z, O.z + rzv * Pm.lat * 0.50 + fzv * Pm.fwd, 34, dt);
+        B.x = dampN(B.x, O.x + rxv * Pm.lat * 0.58 + fxv * (Pm.fwd - 0.16), 34, dt);
+        B.z = dampN(B.z, O.z + rzv * Pm.lat * 0.58 + fzv * (Pm.fwd - 0.16), 34, dt);
         B.y = dampN(B.y, Pm.ballY - O.crouch * 0.08, 36, dt);
       } else {
         B.latCur = dampN(B.latCur, O.latTgt, 16, dt);
-        const hx = O.x + rxv * B.latCur * 0.40 + fxv * O.fwdOff;
-        const hz = O.z + rzv * B.latCur * 0.40 + fzv * O.fwdOff;
+        const hx = O.x + rxv * B.latCur * 0.54 + fxv * (O.fwdOff - 0.16);
+        const hz = O.z + rzv * B.latCur * 0.54 + fzv * (O.fwdOff - 0.16);
         const hH = (O.lowT > 0 ? 0.58 : (hang ? 1.16 : 1.02)) - O.crouch * 0.18;
         const yv = BALL_R + (hH - BALL_R) * Math.pow(Math.abs(Math.cos(Math.PI * ph)), 1.22);
         B.x = dampN(B.x, hx, 22, dt); B.z = dampN(B.z, hz, 22, dt);
@@ -1157,7 +1158,7 @@ Input.update = function (dt) {
 const O = {
   x: 0, z: 7.9, vx: 0, vz: 0, yaw: Math.PI, crouch: 0.34, lift: 0, spd: 0, spdMem: 0,
   st: 'idle', hand: 1, latTgt: 1, lowT: 0, hang: 0,
-  dribPhase: 0.2, dribDur: 0.5, fwdOff: 0.24,
+  dribPhase: 0.2, dribDur: 0.5, fwdOff: 0.08,
   move: null, prim: null, windowT: 0, windowType: '', chain: 0, chainT: 0,
   dribbles: 0, pickedUp: false, pivot: -1, burstT: 0, hesiArmed: true,
   gT: 0, gDur: 0.2, riseT: 0, riseDur: 0.3, fallT: 0, jumpH: 0.5,
@@ -1169,7 +1170,7 @@ function oReset(x, z) {
   O.st = 'idle'; O.hand = 1; O.latTgt = 1; O.lowT = 0; O.hang = 0;
   O.dribPhase = 0.2; O.move = null; O.prim = null; O.windowT = 0; O.chain = 0;
   O.dribbles = 0; O.pickedUp = false; O.pivot = -1; O.burstT = 0;
-  O.fwdOff = 0.24;
+  O.fwdOff = 0.08;
   O.lift = 0; O.followT = 0; O.crouch = 0.34; O.contactCd = 0; O.clampT = 0; O.spdMem = 0;
 }
 function chainUp(n) { O.chain = Math.min(3, O.chain + (n || 1)); O.chainT = 1.2; }
@@ -1552,7 +1553,7 @@ function offenseUpdate(dt) {
       }
     } else {
       O.latTgt = dampN(O.latTgt, O.hand * (O.spd < 0.6 && toD > ARC_R - 1 ? 0.92 : 1), 8, dt);
-      O.fwdOff = dampN(O.fwdOff, (O.vx * fx + O.vz * fz) < -0.8 ? -0.2 : 0.24, 8, dt);
+      O.fwdOff = dampN(O.fwdOff, (O.vx * fx + O.vz * fz) < -0.8 ? -0.22 : 0.08, 8, dt);
     }
     // crouch / stance
     const base = O.pickedUp ? 0.42 : (inp.active && inp.mag < 0.12 && O.spd < 0.8 ? 0.46 : 0.32 + Math.min(0.14, O.spd * 0.03));
