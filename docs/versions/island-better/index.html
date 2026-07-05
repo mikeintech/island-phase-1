@@ -38,12 +38,14 @@
   button{pointer-events:auto;background:none;border:1.5px solid var(--dim);color:var(--bone);
     font-family:inherit;font-weight:800;letter-spacing:.14em;cursor:pointer;border-radius:2px}
   button:active{background:var(--bone);color:var(--ink)}
-  #btnBack,#btnDiff,#btnHelp,#btnLab{position:absolute;z-index:8;display:none;font-size:10px;padding:7px 10px;
+  #btnBack,#btnDiff,#btnHelp,#btnLab,#btnCam,#btnZoom{position:absolute;z-index:8;display:none;font-size:10px;padding:7px 10px;
     top:calc(64px + env(safe-area-inset-top));background:rgba(12,11,14,.5)}
   #btnBack{right:14px}
   #btnHelp{right:58px}
   #btnDiff{right:102px}
   #btnLab{right:158px}
+  #btnCam{right:206px}
+  #btnZoom{right:262px}
 
   /* ---- banner / chips / cue ---- */
   #banner{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;z-index:6;
@@ -164,7 +166,7 @@
     #stage.labSide{overflow:visible;transform:translateX(calc(-50% - 225px))}
     #stage.labSide #labPanel{left:calc(100% + 16px);right:auto;top:calc(12px + env(safe-area-inset-top));
       bottom:12px;width:min(420px,calc(100vw - 500px));min-width:330px;max-height:none}
-    #stage.labSide #btnLab{right:14px}
+    #stage.labSide #btnLab{right:158px}
     #stage.labSide .labPadGrid{grid-template-columns:1fr 1fr}
     #stage.labSide .labPadBox{height:132px}
   }
@@ -194,6 +196,8 @@
   <button id="btnHelp">?</button>
   <button id="btnDiff">MED</button>
   <button id="btnLab">LAB</button>
+  <button id="btnCam">DUEL</button>
+  <button id="btnZoom">TIGHT</button>
 
   <div id="banner"><div id="bMain" class="disp"></div><div id="bSub"></div></div>
   <div id="chips"></div>
@@ -372,7 +376,7 @@ const ui = {
   labExport: $('labExport'), labImport: $('labImport'), labCopy: $('labCopy'),
   menu: $('menu'), end: $('end'), endTitle: $('endTitle'), endSub: $('endSub'),
   btnFree: $('btnFree'), btnMatch: $('btnMatch'), btnRematch: $('btnRematch'),
-  btnMenu2: $('btnMenu2'), btnBack: $('btnBack'), btnDiff: $('btnDiff'),
+  btnMenu2: $('btnMenu2'), btnBack: $('btnBack'), btnDiff: $('btnDiff'), btnCam: $('btnCam'), btnZoom: $('btnZoom'),
   replayTag: $('replayTag'), barTop: $('barTop'), barBot: $('barBot')
 };
 
@@ -1921,6 +1925,20 @@ const Cam = {
   x: 0, y: 2.1, z: 12, lx: 0, ly: 1.4, lz: 4, fov: 56,
   fwdX: 0, fwdZ: -1, rightX: 1, rightZ: 0, shake: 0, beatT: 0
 };
+const CAM_STORE = 'island.camera.v1';
+let camMode = 'DUEL', camZoom = 'TIGHT';
+try {
+  const savedCam = JSON.parse(localStorage.getItem(CAM_STORE) || '{}');
+  if (savedCam.mode === 'ARENA') camMode = 'ARENA';
+  if (savedCam.zoom === 'WIDE') camZoom = 'WIDE';
+} catch (e) {}
+function saveCamPrefs() {
+  try { localStorage.setItem(CAM_STORE, JSON.stringify({ mode: camMode, zoom: camZoom })); } catch (e) {}
+}
+function refreshCamButtons() {
+  ui.btnCam.textContent = camMode;
+  ui.btnZoom.textContent = camZoom;
+}
 function camUpdate(dt) {
   let px, py, pz, lx, ly, lz, fov = 56;
   if (Replay.on) {
@@ -1931,20 +1949,30 @@ function camUpdate(dt) {
     lx = mx; ly = 1.35; lz = mz - 0.5;
     fov = 50;
   } else {
+    const arena = camMode === 'ARENA';
+    const wide = camZoom === 'WIDE';
     const fx0 = lerp(O.x, D.x, 0.42), fz0 = lerp(O.z, D.z, 0.42);
     const bx = O.x - RIM.x, bz = O.z - RIM.z;
     const bl = hyp(bx, bz) || 1;
-    let back = 4.0, h = 2.12, ahead = 2.5;
-    if (G.phase === 'check') { back = 3.2; h = 1.9; }
-    if (O.burstT > 0 || O.spd > 3.4) { back += 0.7; fov += 5; }
-    if (O.st === 'gather' || O.st === 'rise') { back -= 0.55; fov -= 2; }
+    const rx = -bz / bl, rz = bx / bl;
+    let back = arena ? 3.25 : 4.0, h = arena ? 1.45 : 2.12, ahead = arena ? 1.55 : 2.5;
+    fov = arena ? 64 : 56;
+    if (G.phase === 'check') { back = arena ? 2.95 : 3.2; h = arena ? 1.36 : 1.9; }
+    if (O.burstT > 0 || O.spd > 3.4) { back += arena ? 0.55 : 0.7; fov += arena ? 3 : 5; }
+    if (O.st === 'gather' || O.st === 'rise') { back -= arena ? 0.18 : 0.55; fov -= arena ? 1 : 2; }
+    if (wide) { back += arena ? 1.05 : 1.25; h += arena ? 0.18 : 0.12; fov += arena ? 2 : 4; ahead += 0.35; }
     if (ball.st === 'flight' || ball.st === 'in' || ball.st === 'rattle') {
       lx = lerp(fx0, ball.x, 0.55); ly = lerp(1.4, ball.y * 0.6 + 0.9, 0.6); lz = lerp(fz0 - ahead, ball.z, 0.55);
+    } else if (arena) {
+      lx = lerp(fx0, D.x, 0.34) + (RIM.x - fx0) * 0.22;
+      ly = 1.18;
+      lz = lerp(fz0, D.z, 0.34) + (RIM.z - fz0) * 0.22;
     } else {
       lx = fx0 + (RIM.x - fx0) * 0.3; ly = 1.38; lz = fz0 + (RIM.z - fz0) * 0.3;
     }
-    px = fx0 + (bx / bl) * back;
-    pz = fz0 + (bz / bl) * back;
+    const arenaSide = arena ? (-1 + clamp(O.x / 5, -0.35, 0.35)) * (wide ? 1.55 : 1.35) : 0;
+    px = fx0 + (bx / bl) * back + rx * arenaSide;
+    pz = fz0 + (bz / bl) * back + rz * arenaSide;
     py = h;
   }
   const l = Cam.beatT > 0 ? 2.4 : 6.5;
@@ -2023,7 +2051,10 @@ G.startGame = function (mode) {
   ui.btnBack.style.display = 'block';
   ui.btnHelp.style.display = 'block';
   ui.btnLab.style.display = 'block';
+  ui.btnCam.style.display = 'block';
+  ui.btnZoom.style.display = 'block';
   ui.btnDiff.style.display = mode === 'free' ? 'block' : 'none';
+  refreshCamButtons();
   ui.helpMenu.classList.remove('show');
   document.getElementById('scores').style.visibility = mode === 'match' ? 'visible' : 'hidden';
   G.hintT = 0;
@@ -2123,6 +2154,8 @@ G.nextPossession = function () {
     ui.btnBack.style.display = 'none';
     ui.btnHelp.style.display = 'none';
     ui.btnLab.style.display = 'none';
+    ui.btnCam.style.display = 'none';
+    ui.btnZoom.style.display = 'none';
     ui.btnDiff.style.display = 'none';
     ui.helpMenu.classList.remove('show');
     labClose();
@@ -2708,12 +2741,26 @@ ui.btnDiff.addEventListener('click', () => {
   const order = ['EASY', 'MED', 'HARD'];
   setDiff(order[(order.indexOf(diffKey) + 1) % 3]);
 });
+ui.btnCam.addEventListener('click', () => {
+  audioInit(); SND.tick();
+  camMode = camMode === 'DUEL' ? 'ARENA' : 'DUEL';
+  saveCamPrefs(); refreshCamButtons();
+  showCue(camMode === 'ARENA' ? 'streetwear arena camera' : 'duel camera');
+});
+ui.btnZoom.addEventListener('click', () => {
+  audioInit(); SND.tick();
+  camZoom = camZoom === 'TIGHT' ? 'WIDE' : 'TIGHT';
+  saveCamPrefs(); refreshCamButtons();
+  showCue(camZoom === 'WIDE' ? 'camera zoomed out' : 'camera tight');
+});
 function showMenu() {
   G.phase = 'menu';
   ui.menu.style.display = 'flex'; ui.end.style.display = 'none';
   ui.hud.style.display = 'none'; ui.btnBack.style.display = 'none';
   ui.btnHelp.style.display = 'none';
   ui.btnLab.style.display = 'none';
+  ui.btnCam.style.display = 'none';
+  ui.btnZoom.style.display = 'none';
   ui.btnDiff.style.display = 'none';
   ui.helpMenu.classList.remove('show');
   labClose();
@@ -2794,6 +2841,7 @@ function defenderIdleDuringResolve(dt) {
 /* boot */
 resize();
 showMenu();
+refreshCamButtons();
 figO.snapTo(O.x, O.z, O.yaw);
 figD.snapTo(D.x, D.z, D.yaw);
 requestAnimationFrame(frame);
