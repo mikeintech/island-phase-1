@@ -38,11 +38,12 @@
   button{pointer-events:auto;background:none;border:1.5px solid var(--dim);color:var(--bone);
     font-family:inherit;font-weight:800;letter-spacing:.14em;cursor:pointer;border-radius:2px}
   button:active{background:var(--bone);color:var(--ink)}
-  #btnBack,#btnDiff,#btnHelp{position:absolute;z-index:8;display:none;font-size:10px;padding:7px 10px;
+  #btnBack,#btnDiff,#btnHelp,#btnLab{position:absolute;z-index:8;display:none;font-size:10px;padding:7px 10px;
     top:calc(64px + env(safe-area-inset-top));background:rgba(12,11,14,.5)}
   #btnBack{right:14px}
   #btnHelp{right:58px}
   #btnDiff{right:102px}
+  #btnLab{right:158px}
 
   /* ---- banner / chips / cue ---- */
   #banner{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;z-index:6;
@@ -114,6 +115,27 @@
   #helpMenu button{font-size:10px;padding:6px 9px}
   #helpMenu .hRows{font-size:10px;line-height:1.9;letter-spacing:.1em;color:var(--dim)}
   #helpMenu b{color:var(--bone)}
+  #labPanel{position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:13;
+    display:none;max-height:74%;overflow:auto;text-align:left;background:rgba(9,8,11,.96);
+    border:1.5px solid var(--dim2);padding:13px;box-shadow:0 18px 56px rgba(0,0,0,.62);touch-action:auto}
+  #labPanel.show{display:block}
+  #labPanel input,#labPanel textarea,#labPanel select{width:100%;background:rgba(242,236,223,.08);
+    border:1px solid var(--dim2);color:var(--bone);font:inherit;font-size:11px;padding:8px;
+    user-select:text;-webkit-user-select:text;border-radius:2px}
+  #labPanel textarea{min-height:76px;resize:vertical;line-height:1.45}
+  #labPanel select{height:74px}
+  .labTop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .labTitle{font-size:13px;font-weight:900;letter-spacing:.22em;color:var(--gold)}
+  .labSub{font-size:9px;letter-spacing:.16em;color:var(--dim);line-height:1.5;margin-bottom:10px;text-transform:uppercase}
+  .labGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .labActions{display:flex;gap:7px;flex-wrap:wrap;margin:9px 0}
+  .labActions button,#labPanel .labTop button{font-size:9px;padding:7px 9px;letter-spacing:.12em}
+  .labSection{border-top:1px solid var(--dim2);padding-top:10px;margin-top:10px}
+  .labRow{display:grid;grid-template-columns:95px 1fr 54px;align-items:center;gap:8px;margin:7px 0}
+  .labRow label{font-size:9px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
+  .labRow input[type=range]{padding:0}
+  .labRow input[type=number]{padding:6px;text-align:right}
+  .labMsg{font-size:9px;letter-spacing:.12em;color:var(--gold);min-height:14px;text-transform:uppercase}
   #endTitle{font-size:56px}
   .goldT{color:var(--gold)}
   .heatT{color:var(--heat)}
@@ -139,6 +161,7 @@
   <button id="btnBack">✕</button>
   <button id="btnHelp">?</button>
   <button id="btnDiff">MED</button>
+  <button id="btnLab">LAB</button>
 
   <div id="banner"><div id="bMain" class="disp"></div><div id="bSub"></div></div>
   <div id="chips"></div>
@@ -156,6 +179,46 @@
       <b>Flick diagonal forward</b> for a curl cross into the lane. Some crosses wrap behind the back.<br/>
       <b>Flick back</b> for snatchback. <b>Back-diagonal</b> gives stepback, or spin when crowded.<br/>
       <b>Pause while moving</b> for a one-hand hesi. Release to gather and shoot. Tap right back to pump fake.
+    </div>
+  </div>
+  <div id="labPanel">
+    <div class="labTop">
+      <div>
+        <div class="labTitle">MECHANICS LAB</div>
+        <div class="labSub">tune motion artifacts · apply live · export json</div>
+      </div>
+      <button id="btnLabClose">CLOSE</button>
+    </div>
+    <div class="labGrid">
+      <input id="labTitleInput" placeholder="artifact title"/>
+      <input id="labAuthorInput" placeholder="creator / tester"/>
+    </div>
+    <textarea id="labNotes" placeholder="notes: what changed, what feels better, what still breaks"></textarea>
+    <div class="labActions">
+      <button id="labTestCross">TEST CROSS</button>
+      <button id="labTestCurl">TEST CURL</button>
+      <button id="labTestBehind">TEST BEHIND</button>
+      <button id="labReset">RESET</button>
+    </div>
+    <div id="labControls" class="labSection"></div>
+    <div class="labSection">
+      <div class="labSub">saved local artifacts</div>
+      <select id="labSlots"></select>
+      <div class="labActions">
+        <button id="labSave">SAVE SLOT</button>
+        <button id="labLoad">LOAD SLOT</button>
+        <button id="labDelete">DELETE</button>
+      </div>
+    </div>
+    <div class="labSection">
+      <div class="labSub">share artifact json</div>
+      <textarea id="labJson" spellcheck="false"></textarea>
+      <div class="labActions">
+        <button id="labExport">EXPORT</button>
+        <button id="labImport">IMPORT/APPLY</button>
+        <button id="labCopy">COPY</button>
+      </div>
+      <div id="labMsg" class="labMsg"></div>
     </div>
   </div>
 
@@ -261,6 +324,12 @@ const ui = {
   banner: $('banner'), bMain: $('bMain'), bSub: $('bSub'), chips: $('chips'),
   checkPrompt: $('checkPrompt'), hint: $('hint'), cue: $('cue'),
   helpMenu: $('helpMenu'), btnHelp: $('btnHelp'), btnHelpClose: $('btnHelpClose'),
+  labPanel: $('labPanel'), btnLab: $('btnLab'), btnLabClose: $('btnLabClose'),
+  labTitleInput: $('labTitleInput'), labAuthorInput: $('labAuthorInput'), labNotes: $('labNotes'),
+  labControls: $('labControls'), labSlots: $('labSlots'), labJson: $('labJson'), labMsg: $('labMsg'),
+  labTestCross: $('labTestCross'), labTestCurl: $('labTestCurl'), labTestBehind: $('labTestBehind'),
+  labReset: $('labReset'), labSave: $('labSave'), labLoad: $('labLoad'), labDelete: $('labDelete'),
+  labExport: $('labExport'), labImport: $('labImport'), labCopy: $('labCopy'),
   menu: $('menu'), end: $('end'), endTitle: $('endTitle'), endSub: $('endSub'),
   btnFree: $('btnFree'), btnMatch: $('btnMatch'), btnRematch: $('btnRematch'),
   btnMenu2: $('btnMenu2'), btnBack: $('btnBack'), btnDiff: $('btnDiff'),
@@ -280,6 +349,20 @@ const DIFFS = {
   HARD: { react: 0.24, maxs: 4.7, acc: 17, commit: 2.5, biteHesi: 0.80, biteFake: 0.85, shade: 0.50, strip: 0.07, jump: 0.70 }
 };
 let DIFF = DIFFS.MED, diffKey = 'MED';
+
+const MECH_DEFAULT = {
+  cross: {
+    dur: { cross: 0.40, curlcross: 0.42, behind: 0.46 },
+    timing: { loadEnd: 0.14, dropEnd: 0.34, catchEnd: 0.66, exitStart: 0.50, exitEnd: 0.86, snap: 0.38, bounce: 0.32, plantStart: 0.24, plantEnd: 0.62 },
+    lat: { loadSide: 0.82, crossCatch: 1.03, curlCatch: 1.08 },
+    fwd: { crossStart: 0.18, crossLoad: 0.25, crossPeak: 0.34, crossCatch: 0.20, curlLoad: 0.30, curlPeak: 0.40, curlCatch: 0.30, behindStart: -0.10, behindLoad: -0.22, behindPeak: -0.36, behindCatch: -0.10 },
+    ball: { crossStart: 1.10, crossHang: 1.24, crossFloor: BALL_R + 0.03, crossCatch: 1.14, behindStart: 0.92, behindHang: 1.02, behindFloor: 0.62, behindCatch: 1.14 },
+    body: { crouchLoad: 0.60, crouchExit: 0.20, behindLoad: 0.52, behindExit: 0.28, shoulderSell: 0.95, shoulderCatch: 0.85, fold: 0.11, waist: 0.08, behindFold: 0.06, behindWaist: 0.04, handSpreadMin: 0.56, handSpreadMax: 0.70 },
+    impulse: { crossLoad: 0.55, curlLat: 0.55, curlFwd: 0.75, behindLat: 1.00, behindFwd: 0.35, crossSnap: 2.25, curlSnapLat: 2.65, curlSnapFwd: 1.45, behindSnapLat: 1.95 }
+  }
+};
+const cloneData = o => JSON.parse(JSON.stringify(o));
+let MECH = cloneData(MECH_DEFAULT);
 
 /* ---------- renderer / scene ---------- */
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
@@ -943,7 +1026,7 @@ function ptXY(e) {
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 stage.addEventListener('pointerdown', e => {
-  if (e.target.closest('button') || e.target.closest('.panel') || e.target.closest('#helpMenu')) return;
+  if (e.target.closest('button') || e.target.closest('.panel') || e.target.closest('#helpMenu') || e.target.closest('#labPanel')) return;
   audioInit();
   if (G.phase === 'menu' || G.phase === 'over') return;
   if (Replay.on) { Replay.skip = true; return; }
@@ -1056,42 +1139,43 @@ function isCrossMove(type) {
 }
 
 function crossPrimitive(M, t) {
+  const C = MECH.cross, T = C.timing;
   const behind = M.type === 'behind';
   const curl = M.type === 'curlcross';
-  const load = smooth(0.00, 0.16, t);
-  const drop = smooth(0.14, 0.34, t);
-  const catchT = smooth(0.34, 0.62, t);
-  const exit = smooth(0.50, 0.86, t);
+  const load = smooth(0.00, T.loadEnd + 0.02, t);
+  const drop = smooth(T.loadEnd, T.dropEnd, t);
+  const catchT = smooth(T.dropEnd, Math.min(T.catchEnd, T.exitEnd), t);
+  const exit = smooth(T.exitStart, T.exitEnd, t);
   let lat, fwd, ballY;
-  if (t < 0.14) {
-    const e = smooth(0, 0.14, t);
-    lat = lerp(M.fromHand, M.fromHand * 0.82, e);
-    fwd = behind ? lerp(-0.10, -0.22, e) : lerp(0.18, curl ? 0.30 : 0.25, e);
-    ballY = lerp(behind ? 0.92 : 1.10, behind ? 1.02 : 1.24, e);
-  } else if (t < 0.34) {
-    const e = smooth(0.14, 0.34, t);
-    lat = lerp(M.fromHand * 0.82, 0, e);
-    fwd = behind ? lerp(-0.22, -0.36, e) : lerp(curl ? 0.30 : 0.25, curl ? 0.40 : 0.34, e);
-    ballY = lerp(behind ? 1.02 : 1.24, behind ? 0.62 : BALL_R + 0.03, e);
+  if (t < T.loadEnd) {
+    const e = smooth(0, T.loadEnd, t);
+    lat = lerp(M.fromHand, M.fromHand * C.lat.loadSide, e);
+    fwd = behind ? lerp(C.fwd.behindStart, C.fwd.behindLoad, e) : lerp(C.fwd.crossStart, curl ? C.fwd.curlLoad : C.fwd.crossLoad, e);
+    ballY = lerp(behind ? C.ball.behindStart : C.ball.crossStart, behind ? C.ball.behindHang : C.ball.crossHang, e);
+  } else if (t < T.dropEnd) {
+    const e = smooth(T.loadEnd, T.dropEnd, t);
+    lat = lerp(M.fromHand * C.lat.loadSide, 0, e);
+    fwd = behind ? lerp(C.fwd.behindLoad, C.fwd.behindPeak, e) : lerp(curl ? C.fwd.curlLoad : C.fwd.crossLoad, curl ? C.fwd.curlPeak : C.fwd.crossPeak, e);
+    ballY = lerp(behind ? C.ball.behindHang : C.ball.crossHang, behind ? C.ball.behindFloor : C.ball.crossFloor, e);
   } else {
-    const e = smooth(0.34, 0.66, t);
-    lat = lerp(0, M.toHand * (curl ? 1.08 : 1.03), e);
-    fwd = behind ? lerp(-0.36, -0.10, e) : lerp(curl ? 0.40 : 0.34, curl ? 0.30 : 0.20, e);
-    ballY = lerp(behind ? 0.62 : BALL_R + 0.03, 1.14, e);
+    const e = smooth(T.dropEnd, T.catchEnd, t);
+    lat = lerp(0, M.toHand * (curl ? C.lat.curlCatch : C.lat.crossCatch), e);
+    fwd = behind ? lerp(C.fwd.behindPeak, C.fwd.behindCatch, e) : lerp(curl ? C.fwd.curlPeak : C.fwd.crossPeak, curl ? C.fwd.curlCatch : C.fwd.crossCatch, e);
+    ballY = lerp(behind ? C.ball.behindFloor : C.ball.crossFloor, behind ? C.ball.behindCatch : C.ball.crossCatch, e);
   }
   const loadSell = load * (1 - drop);
   const exitSell = catchT;
   return {
     lat, fwd, ballY,
-    crouch: behind ? lerp(0.52, 0.28, exit) : lerp(0.60, 0.20, exit),
+    crouch: behind ? lerp(C.body.behindLoad, C.body.behindExit, exit) : lerp(C.body.crouchLoad, C.body.crouchExit, exit),
     hang: t < 0.24 ? 0.08 : t > 0.46 ? 0.18 : 0,
-    plant: t > 0.24 && t < 0.62,
-    shoulder: M.dir * (-0.95 * loadSell + 0.85 * exitSell),
-    fold: (1 - exit) * (behind ? 0.06 : 0.11),
-    waist: (1 - exit) * (behind ? 0.04 : 0.08),
-    handSpread: lerp(0.56, 0.70, Math.sin(Math.PI * clamp(t, 0, 1))),
-    snapReady: t > 0.38,
-    bounceReady: t >= 0.32,
+    plant: t > T.plantStart && t < T.plantEnd,
+    shoulder: M.dir * (-C.body.shoulderSell * loadSell + C.body.shoulderCatch * exitSell),
+    fold: (1 - exit) * (behind ? C.body.behindFold : C.body.fold),
+    waist: (1 - exit) * (behind ? C.body.behindWaist : C.body.waist),
+    handSpread: lerp(C.body.handSpreadMin, C.body.handSpreadMax, Math.sin(Math.PI * clamp(t, 0, 1))),
+    snapReady: t > T.snap,
+    bounceReady: t >= T.bounce,
     exit
   };
 }
@@ -1102,20 +1186,21 @@ function startMove(type, dir, wx, wz) {
   const fx = toX / tl, fz = toZ / tl;
   const rx = -fz, rz = fx;
   const M = { type, t: 0, dur: 0.26, dir, fromHand: O.hand, toHand: O.hand, snapped: false };
+  const C = MECH.cross;
   switch (type) {
     case 'cross':
-      M.dur = 0.40; M.toHand = -O.hand; O.lowT = 0.08; O.hang = 0.14;
-      impulse(-rx * dir * 0.55, -rz * dir * 0.55);
+      M.dur = C.dur.cross; M.toHand = -O.hand; O.lowT = 0.08; O.hang = 0.14;
+      impulse(-rx * dir * C.impulse.crossLoad, -rz * dir * C.impulse.crossLoad);
       D.event('lat', dir, 0.9); SND.squeak(0.6); chainUp();
       break;
     case 'curlcross':
-      M.dur = 0.42; M.toHand = -O.hand; O.lowT = 0.08; O.hang = 0.13;
-      impulse(rx * dir * 0.55 + fx * 0.75, rz * dir * 0.55 + fz * 0.75);
+      M.dur = C.dur.curlcross; M.toHand = -O.hand; O.lowT = 0.08; O.hang = 0.13;
+      impulse(rx * dir * C.impulse.curlLat + fx * C.impulse.curlFwd, rz * dir * C.impulse.curlLat + fz * C.impulse.curlFwd);
       D.event('drive', dir, 0.85); SND.squeak(0.75); chainUp(2);
       break;
     case 'behind':
-      M.dur = 0.46; M.toHand = -O.hand; O.lowT = 0.12; O.hang = 0.10;
-      impulse(rx * dir * 1.0 + fx * 0.35, rz * dir * 1.0 + fz * 0.35);
+      M.dur = C.dur.behind; M.toHand = -O.hand; O.lowT = 0.12; O.hang = 0.10;
+      impulse(rx * dir * C.impulse.behindLat + fx * C.impulse.behindFwd, rz * dir * C.impulse.behindLat + fz * C.impulse.behindFwd);
       D.event('lat', dir, 0.62); SND.squeak(0.65); chainUp(2);
       break;
     case 'between':
@@ -1359,9 +1444,10 @@ function offenseUpdate(dt) {
         }
         if (!M.snapped && Pm.snapReady) {
           M.snapped = true; O.hand = M.toHand;
-          const pwr = M.type === 'curlcross' ? 2.65 : M.type === 'behind' ? 1.95 : 2.25;
-          impulse(rx * M.dir * pwr + (M.type === 'curlcross' ? fx * 1.45 : 0),
-                  rz * M.dir * pwr + (M.type === 'curlcross' ? fz * 1.45 : 0));
+          const C = MECH.cross;
+          const pwr = M.type === 'curlcross' ? C.impulse.curlSnapLat : M.type === 'behind' ? C.impulse.behindSnapLat : C.impulse.crossSnap;
+          impulse(rx * M.dir * pwr + (M.type === 'curlcross' ? fx * C.impulse.curlSnapFwd : 0),
+                  rz * M.dir * pwr + (M.type === 'curlcross' ? fz * C.impulse.curlSnapFwd : 0));
         }
         if (Pm.exit > 0.15) {
           O.hang = Math.max(O.hang, 0.18);
@@ -1884,6 +1970,7 @@ G.startGame = function (mode) {
   ui.modeTag.textContent = mode === 'match' ? 'FIRST TO 7 · ' + diffKey : 'FREE PLAY · ' + diffKey;
   ui.btnBack.style.display = 'block';
   ui.btnHelp.style.display = 'block';
+  ui.btnLab.style.display = 'block';
   ui.btnDiff.style.display = mode === 'free' ? 'block' : 'none';
   ui.helpMenu.classList.remove('show');
   document.getElementById('scores').style.visibility = mode === 'match' ? 'visible' : 'hidden';
@@ -1983,8 +2070,10 @@ G.nextPossession = function () {
     ui.end.style.display = 'flex';
     ui.btnBack.style.display = 'none';
     ui.btnHelp.style.display = 'none';
+    ui.btnLab.style.display = 'none';
     ui.btnDiff.style.display = 'none';
     ui.helpMenu.classList.remove('show');
+    labClose();
     const won = G.sy >= 7;
     ui.endTitle.textContent = won ? 'YOU WIN' : 'CLAMPED';
     ui.endTitle.className = 'disp ' + (won ? 'goldT' : 'heatT');
@@ -2100,6 +2189,165 @@ function checkIdle(dt) {
   D.yaw = wy;
 }
 
+/* ---------- mechanics lab ---------- */
+const LAB_STORE = 'island.mechanics.artifacts.v1';
+const LAB = { open: false, controls: [] };
+const LAB_CONTROLS = [
+  ['cross.dur.cross', 'cross duration', 0.24, 0.70, 0.01],
+  ['cross.dur.curlcross', 'curl duration', 0.24, 0.76, 0.01],
+  ['cross.dur.behind', 'behind duration', 0.28, 0.82, 0.01],
+  ['cross.timing.loadEnd', 'load end', 0.06, 0.24, 0.01],
+  ['cross.timing.dropEnd', 'bounce frame', 0.22, 0.48, 0.01],
+  ['cross.timing.catchEnd', 'catch frame', 0.44, 0.80, 0.01],
+  ['cross.timing.snap', 'snap impulse', 0.26, 0.58, 0.01],
+  ['cross.timing.plantStart', 'plant start', 0.12, 0.42, 0.01],
+  ['cross.timing.plantEnd', 'plant end', 0.40, 0.78, 0.01],
+  ['cross.body.crouchLoad', 'crouch load', 0.30, 0.80, 0.01],
+  ['cross.body.crouchExit', 'crouch exit', 0.08, 0.42, 0.01],
+  ['cross.body.shoulderSell', 'shoulder sell', 0.20, 1.50, 0.01],
+  ['cross.body.shoulderCatch', 'shoulder catch', 0.10, 1.40, 0.01],
+  ['cross.body.handSpreadMin', 'hand min', 0.36, 0.78, 0.01],
+  ['cross.body.handSpreadMax', 'hand max', 0.46, 0.95, 0.01],
+  ['cross.fwd.crossPeak', 'cross reach', 0.16, 0.58, 0.01],
+  ['cross.fwd.curlPeak', 'curl reach', 0.20, 0.70, 0.01],
+  ['cross.fwd.behindPeak', 'behind depth', -0.62, -0.12, 0.01],
+  ['cross.ball.crossHang', 'ball hang', 0.88, 1.50, 0.01],
+  ['cross.ball.crossFloor', 'ball floor', 0.12, 0.42, 0.01],
+  ['cross.impulse.crossSnap', 'cross burst', 0.80, 3.80, 0.05],
+  ['cross.impulse.curlSnapLat', 'curl side burst', 0.80, 4.20, 0.05],
+  ['cross.impulse.curlSnapFwd', 'curl drive burst', 0.20, 2.40, 0.05],
+  ['cross.impulse.behindSnapLat', 'behind burst', 0.60, 3.60, 0.05]
+];
+function pathGet(o, path) {
+  return path.split('.').reduce((a, k) => a && a[k], o);
+}
+function pathSet(o, path, value) {
+  const parts = path.split('.');
+  let cur = o;
+  for (let i = 0; i < parts.length - 1; i++) cur = cur[parts[i]];
+  cur[parts[parts.length - 1]] = value;
+}
+function mergeMechanics(base, patch) {
+  for (const k in patch) {
+    if (!(k in base)) continue;
+    if (base[k] && typeof base[k] === 'object' && !Array.isArray(base[k]) && patch[k] && typeof patch[k] === 'object') mergeMechanics(base[k], patch[k]);
+    else if (typeof base[k] === 'number') base[k] = Number(patch[k]);
+  }
+  return base;
+}
+function sanitizeMech() {
+  const T = MECH.cross.timing, B = MECH.cross.body, ballCfg = MECH.cross.ball;
+  T.loadEnd = clamp(T.loadEnd, 0.05, 0.25);
+  T.dropEnd = clamp(Math.max(T.dropEnd, T.loadEnd + 0.06), 0.18, 0.52);
+  T.catchEnd = clamp(Math.max(T.catchEnd, T.dropEnd + 0.08), 0.36, 0.86);
+  T.exitStart = clamp(Math.max(T.exitStart, T.dropEnd + 0.05), 0.34, 0.82);
+  T.exitEnd = clamp(Math.max(T.exitEnd, T.exitStart + 0.06), 0.48, 0.98);
+  T.snap = clamp(T.snap, T.loadEnd + 0.05, T.catchEnd);
+  T.bounce = clamp(T.bounce, T.loadEnd + 0.04, T.catchEnd);
+  T.plantStart = clamp(T.plantStart, 0.08, T.plantEnd - 0.04);
+  T.plantEnd = clamp(Math.max(T.plantEnd, T.plantStart + 0.04), 0.20, 0.88);
+  B.handSpreadMax = Math.max(B.handSpreadMax, B.handSpreadMin + 0.02);
+  ballCfg.crossFloor = clamp(ballCfg.crossFloor, BALL_R + 0.005, 0.45);
+}
+function labSaved() {
+  try { return JSON.parse(localStorage.getItem(LAB_STORE) || '[]') || []; }
+  catch (e) { return []; }
+}
+function labWriteSaved(items) {
+  try { localStorage.setItem(LAB_STORE, JSON.stringify(items)); } catch (e) {}
+}
+function labStatus(msg) {
+  ui.labMsg.textContent = msg || '';
+  if (msg) setTimeout(() => { if (ui.labMsg.textContent === msg) ui.labMsg.textContent = ''; }, 2200);
+}
+function labArtifact() {
+  return {
+    schema: 'island.mechanics.artifact.v1',
+    id: 'artifact-' + Date.now().toString(36),
+    title: ui.labTitleInput.value.trim() || 'Untitled mechanics pass',
+    author: ui.labAuthorInput.value.trim() || 'unknown',
+    notes: ui.labNotes.value.trim(),
+    game: 'island-better',
+    createdAt: new Date().toISOString(),
+    config: cloneData(MECH)
+  };
+}
+function labRenderSlots() {
+  const items = labSaved();
+  ui.labSlots.innerHTML = '';
+  items.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = (a.title || 'Untitled') + ' · ' + (a.author || 'unknown');
+    ui.labSlots.appendChild(opt);
+  });
+}
+function labRefreshControls() {
+  sanitizeMech();
+  LAB.controls.forEach(c => {
+    const v = Number(pathGet(MECH, c.path)).toFixed(c.step < 0.05 ? 2 : 1);
+    c.range.value = v; c.num.value = v;
+  });
+}
+function labBuildControls() {
+  if (LAB.controls.length) { labRefreshControls(); return; }
+  const title = document.createElement('div');
+  title.className = 'labSub';
+  title.textContent = 'cross-family motion primitive';
+  ui.labControls.appendChild(title);
+  LAB_CONTROLS.forEach(([path, label, min, max, step]) => {
+    const row = document.createElement('div'); row.className = 'labRow';
+    const l = document.createElement('label'); l.textContent = label;
+    const range = document.createElement('input'); range.type = 'range'; range.min = min; range.max = max; range.step = step;
+    const num = document.createElement('input'); num.type = 'number'; num.min = min; num.max = max; num.step = step;
+    function apply(v) {
+      pathSet(MECH, path, clamp(Number(v), Number(min), Number(max)));
+      sanitizeMech(); labRefreshControls();
+    }
+    range.addEventListener('input', () => apply(range.value));
+    num.addEventListener('change', () => apply(num.value));
+    row.appendChild(l); row.appendChild(range); row.appendChild(num);
+    ui.labControls.appendChild(row);
+    LAB.controls.push({ path, range, num, step });
+  });
+  labRefreshControls();
+}
+function labExport() {
+  ui.labJson.value = JSON.stringify(labArtifact(), null, 2);
+}
+function labApplyArtifact(a) {
+  const cfg = a && (a.config || a.mechanics || a);
+  if (!cfg || !cfg.cross) throw new Error('missing cross config');
+  MECH = mergeMechanics(cloneData(MECH_DEFAULT), cfg);
+  sanitizeMech();
+  ui.labTitleInput.value = a.title || ui.labTitleInput.value || '';
+  ui.labAuthorInput.value = a.author || ui.labAuthorInput.value || '';
+  ui.labNotes.value = a.notes || ui.labNotes.value || '';
+  labRefreshControls(); labExport();
+}
+function labOpen() {
+  LAB.open = true;
+  ui.helpMenu.classList.remove('show');
+  ui.labPanel.classList.add('show');
+  labBuildControls(); labRenderSlots(); labExport();
+}
+function labClose() {
+  LAB.open = false;
+  ui.labPanel.classList.remove('show');
+}
+function labTestMove(type) {
+  audioInit(); SND.blip();
+  if (G.phase === 'menu' || G.phase === 'over') G.startGame('free');
+  G.phase = 'live'; G.resolved = false; G.pending = null; G.clockRun = false;
+  ui.checkPrompt.classList.remove('show');
+  oReset(0, 7.9); dReset(0, 6.35);
+  O.st = 'dribble'; O.hand = 1; O.latTgt = 1; O.dribPhase = 0.12;
+  ball.st = 'dribble'; ball.setPos(0.28, 1.02, 7.56);
+  figO.snapTo(O.x, O.z, O.yaw); figD.snapTo(D.x, D.z, D.yaw);
+  startMove(type, -1, -1, 0);
+  labStatus('testing ' + type);
+}
+
 /* ---------- UI wiring ---------- */
 function setDiff(k) {
   diffKey = k; DIFF = DIFFS[k];
@@ -2118,10 +2366,56 @@ ui.btnBack.addEventListener('click', () => { showMenu(); });
 ui.btnHelp.addEventListener('click', () => {
   audioInit(); SND.tick();
   ui.helpMenu.classList.toggle('show');
+  if (ui.helpMenu.classList.contains('show')) labClose();
 });
 ui.btnHelpClose.addEventListener('click', () => {
   SND.tick();
   ui.helpMenu.classList.remove('show');
+});
+ui.btnLab.addEventListener('click', () => {
+  audioInit(); SND.tick();
+  LAB.open ? labClose() : labOpen();
+});
+ui.btnLabClose.addEventListener('click', () => { SND.tick(); labClose(); });
+ui.labTestCross.addEventListener('click', () => labTestMove('cross'));
+ui.labTestCurl.addEventListener('click', () => labTestMove('curlcross'));
+ui.labTestBehind.addEventListener('click', () => labTestMove('behind'));
+ui.labReset.addEventListener('click', () => {
+  MECH = cloneData(MECH_DEFAULT); sanitizeMech(); labRefreshControls(); labExport(); labStatus('reset to default');
+});
+ui.labSave.addEventListener('click', () => {
+  const a = labArtifact();
+  const items = labSaved();
+  items.unshift(a);
+  labWriteSaved(items.slice(0, 24));
+  labRenderSlots();
+  ui.labSlots.value = a.id;
+  labExport();
+  labStatus('saved local slot');
+});
+ui.labLoad.addEventListener('click', () => {
+  const item = labSaved().find(a => a.id === ui.labSlots.value);
+  if (!item) { labStatus('no slot selected'); return; }
+  try { labApplyArtifact(item); labStatus('loaded slot'); } catch (e) { labStatus('bad slot'); }
+});
+ui.labDelete.addEventListener('click', () => {
+  const id = ui.labSlots.value;
+  labWriteSaved(labSaved().filter(a => a.id !== id));
+  labRenderSlots();
+  labStatus('deleted slot');
+});
+ui.labExport.addEventListener('click', () => { labExport(); labStatus('exported json'); });
+ui.labImport.addEventListener('click', () => {
+  try { labApplyArtifact(JSON.parse(ui.labJson.value)); labStatus('imported and applied'); }
+  catch (e) { labStatus('invalid artifact json'); }
+});
+ui.labCopy.addEventListener('click', () => {
+  labExport();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ui.labJson.value).then(() => labStatus('copied json'), () => labStatus('copy failed'));
+  } else {
+    ui.labJson.focus(); ui.labJson.select(); labStatus('json selected');
+  }
 });
 ui.btnDiff.addEventListener('click', () => {
   audioInit(); SND.tick();
@@ -2133,8 +2427,10 @@ function showMenu() {
   ui.menu.style.display = 'flex'; ui.end.style.display = 'none';
   ui.hud.style.display = 'none'; ui.btnBack.style.display = 'none';
   ui.btnHelp.style.display = 'none';
+  ui.btnLab.style.display = 'none';
   ui.btnDiff.style.display = 'none';
   ui.helpMenu.classList.remove('show');
+  labClose();
   ui.checkPrompt.classList.remove('show');
   ui.banner.className = ''; ui.chips.classList.remove('show');
   Replay.on = false;
