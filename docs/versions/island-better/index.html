@@ -638,14 +638,15 @@ function makeFigure(bodyCol, accentCol, isDef) {
         foot.y = Math.sin(Math.PI * foot.t) * (0.05 + Math.min(0.09, spd * 0.02));
       } else {
         foot.y = 0;
-        const pivotHold = (p.pivot !== undefined && p.pivot === s);
         const err = hyp(hx - foot.x, hz - foot.z);
         const other = feet[1 - s];
-        const trig = p.plant ? 0.06 : 0.17 + spd * 0.105;
-        if (!pivotHold && err > trig && other.t > 0.55) {
+        const pivotHold = (p.pivot !== undefined && p.pivot === s && err < 0.42);
+        const trig = p.plant ? 0.20 : 0.17 + spd * 0.105;
+        const emergency = err > 0.45;
+        if (!pivotHold && err > trig && (other.t > 0.55 || emergency)) {
           foot.fx = foot.x; foot.fz = foot.z;
           foot.tx = hx; foot.tz = hz;
-          foot.dur = clamp(0.26 - spd * 0.022, 0.12, 0.26);
+          foot.dur = emergency ? 0.11 : clamp(0.26 - spd * 0.022, 0.12, 0.26);
           foot.t = 0;
         }
       }
