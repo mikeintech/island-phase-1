@@ -851,8 +851,8 @@ const ball = (function () {
       const fxv = Math.sin(O.yaw), fzv = Math.cos(O.yaw);
       const rxv = -fzv, rzv = fxv;
       const rootY = P.HIP * (1 - O.crouch * 0.34) + O.lift;
-      B.x = dampN(B.x, O.x + rxv * O.hand * 0.30 + fxv * 0.12, 18, dt);
-      B.z = dampN(B.z, O.z + rzv * O.hand * 0.30 + fzv * 0.12, 18, dt);
+      B.x = dampN(B.x, O.x + rxv * O.hand * 0.28 + fxv * 0.34, 18, dt);
+      B.z = dampN(B.z, O.z + rzv * O.hand * 0.28 + fzv * 0.34, 18, dt);
       B.y = dampN(B.y, rootY + 0.08, 18, dt);
     } else if (B.st === 'carry') {
       // gather / rise: position driven by offense controller
@@ -1038,7 +1038,7 @@ Input.update = function (dt) {
 const O = {
   x: 0, z: 7.9, vx: 0, vz: 0, yaw: Math.PI, crouch: 0.34, lift: 0, spd: 0, spdMem: 0,
   st: 'idle', hand: 1, latTgt: 1, lowT: 0, hang: 0,
-  dribPhase: 0.2, dribDur: 0.5, fwdOff: 0.14,
+  dribPhase: 0.2, dribDur: 0.5, fwdOff: 0.24,
   move: null, windowT: 0, windowType: '', chain: 0, chainT: 0,
   dribbles: 0, pickedUp: false, pivot: -1, burstT: 0, hesiArmed: true,
   gT: 0, gDur: 0.2, riseT: 0, riseDur: 0.3, fallT: 0, jumpH: 0.5,
@@ -1050,6 +1050,7 @@ function oReset(x, z) {
   O.st = 'idle'; O.hand = 1; O.latTgt = 1; O.lowT = 0; O.hang = 0;
   O.dribPhase = 0.2; O.move = null; O.windowT = 0; O.chain = 0;
   O.dribbles = 0; O.pickedUp = false; O.pivot = -1; O.burstT = 0;
+  O.fwdOff = 0.24;
   O.lift = 0; O.followT = 0; O.crouch = 0.34; O.contactCd = 0; O.clampT = 0; O.spdMem = 0;
 }
 function chainUp(n) { O.chain = Math.min(3, O.chain + (n || 1)); O.chainT = 1.2; }
@@ -1368,13 +1369,13 @@ function offenseUpdate(dt) {
           O.hand = M.toHand; O.latTgt = O.hand;
           if (M.type === 'curlcross' || M.type === 'behind' || M.type === 'spin') O.burstT = Math.max(O.burstT, 0.18);
         }
-        if (M.type === 'snatch') O.fwdOff = 0.14;
+        if (M.type === 'snatch') O.fwdOff = 0.18;
         if (M.type !== 'inout') O.latTgt = O.hand;
         O.move = null;
       }
     } else {
       O.latTgt = dampN(O.latTgt, O.hand * (O.spd < 0.6 && toD > ARC_R - 1 ? 0.92 : 1), 8, dt);
-      O.fwdOff = dampN(O.fwdOff, (O.vx * fx + O.vz * fz) < -0.8 ? -0.2 : 0.14, 8, dt);
+      O.fwdOff = dampN(O.fwdOff, (O.vx * fx + O.vz * fz) < -0.8 ? -0.2 : 0.24, 8, dt);
     }
     // crouch / stance
     const base = O.pickedUp ? 0.42 : (inp.active && inp.mag < 0.12 && O.spd < 0.8 ? 0.46 : 0.32 + Math.min(0.14, O.spd * 0.03));
@@ -1537,17 +1538,17 @@ function releaseBall() {
   const make = Math.random() < clamp(Q * 1.25 - 0.02, 0.04, 0.97);
   const beatenRecent = (G.t - D.beatenStamp) < 2.2;
   const bankAngle = Math.abs(O.x) > 0.75 && Math.abs(O.x) < 4.2 && dist > 2.0 && dist < 6.4;
-  const bankLook = bankAngle && contest < 0.45 && balance > 0.48 && Math.random() < (dist < 3.2 ? 0.34 : 0.18);
+  const bankLook = bankAngle && contest < 0.45 && balance > 0.48 && Math.random() < (dist < 3.2 ? 0.22 : 0.10);
   let outcome, meta;
   if (make) {
-    if (contest < 0.18 && Q > 0.64 && !bankLook) {
+    if (contest < 0.26 && Q > 0.56 && (!bankLook || Q > 0.78)) {
       const cooked = beatenRecent && sepS > 0.66;
       outcome = cooked ? 'cooked' : 'pure';
       meta = { kind: 'in', pure: true };
     } else if (bankLook) {
       outcome = 'bank';
       meta = { kind: 'bank', pure: false, bankX: clamp(O.x * 0.22, -0.5, 0.5) };
-    } else if (Q > 0.5) { outcome = 'clean'; meta = { kind: 'in', pure: false }; }
+    } else if (Q > 0.42) { outcome = 'clean'; meta = { kind: 'in', pure: false }; }
     else { outcome = 'rimmake'; meta = { kind: 'rattle', pure: false }; }
   } else {
     outcome = 'miss';
@@ -1859,7 +1860,7 @@ G.startCheck = function () {
   G.resolved = false; G.pending = null;
   oReset(0, 7.9); dReset(0, 6.35);
   figO.snapTo(O.x, O.z, O.yaw); figD.snapTo(D.x, D.z, D.yaw);
-  ball.st = 'held'; ball.setPos(O.x + 0.3, 1.0, O.z);
+  ball.st = 'held'; ball.setPos(O.x + 0.28, 1.0, O.z - 0.34);
   ball.vx = ball.vy = ball.vz = 0;
   G.clock = 12; G.clockRun = false;
   G.rec.frames.length = 0; G.rec.netT = 0; G.rec.relT = 0;
@@ -2104,7 +2105,7 @@ function showMenu() {
   ui.replayTag.style.display = 'none';
   ui.barTop.classList.remove('show'); ui.barBot.classList.remove('show');
   oReset(0, 7.9); dReset(0, 6.35);
-  ball.st = 'held'; ball.setPos(0.3, 1, 7.9);
+  ball.st = 'held'; ball.setPos(0.28, 1, 7.56);
 }
 
 /* ---------- main loop ---------- */
