@@ -275,8 +275,8 @@ const BALL_R = 0.121;
 const GRAV = -9.6;
 
 const DIFFS = {
-  EASY: { react: 0.22, maxs: 4.8, acc: 18, commit: 2.5, biteHesi: 0.80, biteFake: 0.85, shade: 0.55, strip: 0.07, jump: 0.70 },
-  MED:  { react: 0.13, maxs: 5.8, acc: 24, commit: 2.0, biteHesi: 0.55, biteFake: 0.60, shade: 0.90, strip: 0.15, jump: 0.85 },
+  EASY: { react: 0.24, maxs: 4.7, acc: 17, commit: 2.5, biteHesi: 0.80, biteFake: 0.85, shade: 0.50, strip: 0.07, jump: 0.70 },
+  MED:  { react: 0.16, maxs: 5.5, acc: 22, commit: 2.0, biteHesi: 0.55, biteFake: 0.60, shade: 0.78, strip: 0.15, jump: 0.85 },
   HARD: { react: 0.08, maxs: 6.5, acc: 29, commit: 1.5, biteHesi: 0.30, biteFake: 0.33, shade: 1.10, strip: 0.24, jump: 0.95 }
 };
 let DIFF = DIFFS.MED, diffKey = 'MED';
@@ -839,6 +839,15 @@ const ball = (function () {
     if (m.kind === 'in') {
       B.st = 'in';
       if (!m.pure) { SND.tick(); SND.rim(0.22); }
+    } else if (m.kind === 'bank') {
+      SND.board();
+      B.st = 'in';
+      B.x = RIM.x + (m.bankX || 0) * 0.35;
+      B.y = RIM.y + 0.18;
+      B.z = RIM.z - 0.10;
+      B.vx = (RIM.x - B.x) * 2.3;
+      B.vz = (RIM.z - B.z) * 2.3;
+      B.vy = -0.75;
     } else if (m.kind === 'rattle') {
       B.st = 'rattle'; B.rt = 0;
       B.ang0 = Math.atan2(B.x - RIM.x, B.z - RIM.z);
@@ -964,14 +973,14 @@ const O = {
   dribbles: 0, pickedUp: false, pivot: -1, burstT: 0, hesiArmed: true,
   gT: 0, gDur: 0.2, riseT: 0, riseDur: 0.3, fallT: 0, jumpH: 0.5,
   shotType: 'set', speedAtGather: 0, midMoveAtG: false, crowdedAtG: false, rhythmAtG: 0,
-  relX: 0, relY: 0, relZ: 0, followT: 0, contactCd: 0, pivotShown: false
+  relX: 0, relY: 0, relZ: 0, followT: 0, contactCd: 0, clampT: 0, pivotShown: false
 };
 function oReset(x, z) {
   O.x = x; O.z = z; O.vx = 0; O.vz = 0; O.yaw = Math.PI;
   O.st = 'idle'; O.hand = 1; O.latTgt = 1; O.lowT = 0; O.hang = 0;
   O.dribPhase = 0.2; O.move = null; O.windowT = 0; O.chain = 0;
   O.dribbles = 0; O.pickedUp = false; O.pivot = -1; O.burstT = 0;
-  O.lift = 0; O.followT = 0; O.crouch = 0.34; O.contactCd = 0; O.spdMem = 0;
+  O.lift = 0; O.followT = 0; O.crouch = 0.34; O.contactCd = 0; O.clampT = 0; O.spdMem = 0;
 }
 function chainUp(n) { O.chain = Math.min(3, O.chain + (n || 1)); O.chainT = 1.2; }
 function impulse(ax, az) { O.vx += ax; O.vz += az; }
@@ -1341,18 +1350,19 @@ function offenseUpdate(dt) {
 }
 
 function resolvePlayerContact(dt) {
-  if (O.st === 'rise' || O.st === 'fall' || O.st === 'recover') return;
+  if (O.st === 'rise' || O.st === 'fall' || O.st === 'recover') { O.clampT = 0; return; }
   const dx = O.x - D.x, dz = O.z - D.z;
   const dd = hyp(dx, dz);
-  if (dd <= 0.001) return;
+  if (dd <= 0.001) { O.clampT = 0; return; }
   const earned = D.beatenT > 0 || D.freezeT > 0 || D.airKind === 'fake';
   const minD = earned ? 0.54 : 0.78;
   const ov = minD - dd;
-  if (ov <= 0) return;
+  if (ov <= 0) { O.clampT = Math.max(0, O.clampT - dt * 3); return; }
 
   const nx = dx / dd, nzv = dz / dd;
   const lane = laneInfo();
   const laneCut = lane.between > 0.25 && lane.laneGap < 0.95 && !earned;
+  O.clampT = laneCut ? O.clampT + dt : Math.max(0, O.clampT - dt * 4);
   const oShare = laneCut ? 0.92 : earned ? 0.62 : 0.82;
   O.x += nx * ov * oShare; O.z += nzv * ov * oShare;
   D.x -= nx * ov * (1 - oShare); D.z -= nzv * ov * (1 - oShare);
@@ -1366,10 +1376,11 @@ function resolvePlayerContact(dt) {
   O.vz = (O.vz + nzv * ov * 3.2) * (laneCut ? 0.35 : 0.58);
   D.vx -= nx * ov * 1.1; D.vz -= nzv * ov * 1.1;
 
-  if (laneCut && !O.move && !O.pickedUp && O.st === 'dribble' && O.contactCd <= 0) {
+  if (laneCut && O.clampT > 0.18 && !O.move && !O.pickedUp && O.st === 'dribble' && O.contactCd <= 0) {
     O.st = 'stopped'; O.pickedUp = true; ball.st = 'held';
     O.pivot = O.hand > 0 ? 0 : 1;
     O.windowT = 0.65; O.windowType = 'bump';
+    O.clampT = 0;
     O.contactCd = 0.7;
     D.staggerT = 0.18;
     SND.thud();
@@ -1434,12 +1445,17 @@ function releaseBall() {
   const green = Q > 0.85 && contest < 0.15;
   const make = Math.random() < clamp(Q * 1.25 - 0.02, 0.04, 0.97);
   const beatenRecent = (G.t - D.beatenStamp) < 2.2;
+  const bankAngle = Math.abs(O.x) > 0.75 && Math.abs(O.x) < 4.2 && dist > 2.0 && dist < 6.4;
+  const bankLook = bankAngle && contest < 0.45 && balance > 0.48 && Math.random() < (dist < 3.2 ? 0.34 : 0.18);
   let outcome, meta;
   if (make) {
-    if (contest < 0.14 && Q > 0.68) {
+    if (contest < 0.18 && Q > 0.64 && !bankLook) {
       const cooked = beatenRecent && sepS > 0.66;
       outcome = cooked ? 'cooked' : 'pure';
       meta = { kind: 'in', pure: true };
+    } else if (bankLook) {
+      outcome = 'bank';
+      meta = { kind: 'bank', pure: false, bankX: clamp(O.x * 0.22, -0.5, 0.5) };
     } else if (Q > 0.5) { outcome = 'clean'; meta = { kind: 'in', pure: false }; }
     else { outcome = 'rimmake'; meta = { kind: 'rattle', pure: false }; }
   } else {
@@ -1451,6 +1467,7 @@ function releaseBall() {
   let ox = 0, oz = 0;
   const sx = (O.x - RIM.x) / (dist || 1), sz = (O.z - RIM.z) / (dist || 1);
   if (outcome === 'pure' || outcome === 'cooked') { const a = rand(Math.PI * 2), r = rand(0.03); ox = Math.sin(a) * r; oz = Math.cos(a) * r; }
+  else if (outcome === 'bank') { ox = meta.bankX; oz = -0.42; }
   else if (outcome === 'clean') { const a = rand(Math.PI * 2); ox = Math.sin(a) * 0.07; oz = Math.cos(a) * 0.07; }
   else if (outcome === 'rimmake') { const a = rand(Math.PI * 2); ox = Math.sin(a) * 0.16; oz = Math.cos(a) * 0.16; }
   else {
@@ -1464,7 +1481,8 @@ function releaseBall() {
     else { const pS = sgn(rand(-1, 1)); ox = -sz * pS * r; oz = sx * pS * r; }
   }
   const T = clamp(0.62 + dist * 0.075, 0.8, 1.5);
-  ball.launch(O.relX, O.relY, O.relZ, RIM.x + ox, RIM.y + 0.02, RIM.z + oz, T, meta);
+  const ty = outcome === 'bank' ? RIM.y + 0.46 : RIM.y + 0.02;
+  ball.launch(O.relX, O.relY, O.relZ, RIM.x + ox, ty, RIM.z + oz, T, meta);
   SND.whoosh();
 
   G.pending = {
@@ -1799,7 +1817,7 @@ G.onBallDead = function () {
   else if (!G.resolved && !G.pending && G.phase === 'live') { G.resolve(false, 0); }
 };
 G.score = function (p) {
-  const label = { pure: 'PURE SWISH', cooked: 'COOKED SWISH', clean: 'CLEAN', rimmake: 'BUCKET' }[p.outcome];
+  const label = { pure: 'PURE SWISH', cooked: 'COOKED SWISH', clean: 'CLEAN', bank: 'BANK', rimmake: 'BUCKET' }[p.outcome];
   const cls = (p.outcome === 'pure' || p.outcome === 'cooked') ? 'gold' : 'make';
   let sub = '+' + p.pts + (p.green ? ' · PERFECT' : '');
   showBanner(label, sub, cls + (p.outcome === 'cooked' ? ' shake' : ''), p.outcome === 'rimmake' ? 1.2 : 1.7);
