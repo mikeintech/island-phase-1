@@ -604,6 +604,7 @@ function makeFigure(bodyCol, accentCol, isDef) {
 
   function pose(p, dt) {
     const { x, z, yaw, crouch, lift } = p;
+    const style = p.style;
     const vx = p.vx || 0, vz = p.vz || 0;
     const spd = hyp(vx, vz);
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
@@ -684,7 +685,7 @@ function makeFigure(bodyCol, accentCol, isDef) {
     if (band) { band.position.set(hdX, hdY + 0.02, hdZ); band.rotation.set(Math.PI / 2 - 0.25, yaw, 0); }
 
     /* --- arms --- */
-    const style = p.style, hand = p.hand || 1; // 1 = right side ball
+    const hand = p.hand || 1; // 1 = right side ball
     const ballIdx = hand > 0 ? 1 : 0;
     const tgt = [[0, 0, 0], [0, 0, 0]];
     const T = G.t;
