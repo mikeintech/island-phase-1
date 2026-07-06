@@ -388,9 +388,9 @@ const BALL_R = 0.121;
 const GRAV = -9.6;
 
 const DIFFS = {
-  EASY: { react: 0.36, maxs: 3.8, acc: 12, commit: 3.1, biteHesi: 0.92, biteFake: 0.94, shade: 0.24, strip: 0.02, jump: 0.45 },
-  MED:  { react: 0.30, maxs: 4.25, acc: 14, commit: 2.8, biteHesi: 0.86, biteFake: 0.90, shade: 0.36, strip: 0.04, jump: 0.58 },
-  HARD: { react: 0.24, maxs: 4.7, acc: 17, commit: 2.5, biteHesi: 0.80, biteFake: 0.85, shade: 0.50, strip: 0.07, jump: 0.70 }
+  EASY: { react: 0.30, maxs: 4.2, acc: 15, commit: 2.8, biteHesi: 0.80, biteFake: 0.85, shade: 0.45, strip: 0.07, jump: 0.70 },
+  MED:  { react: 0.20, maxs: 4.9, acc: 19, commit: 2.2, biteHesi: 0.55, biteFake: 0.60, shade: 0.80, strip: 0.15, jump: 0.85 },
+  HARD: { react: 0.13, maxs: 5.4, acc: 23, commit: 1.6, biteHesi: 0.30, biteFake: 0.33, shade: 1.00, strip: 0.24, jump: 0.95 }
 };
 let DIFF = DIFFS.MED, diffKey = 'MED';
 
@@ -694,7 +694,7 @@ function makeFigure(bodyCol, accentCol, isDef) {
   const cyl = r => mk(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.82, 1, 7), mat));
   const F = {
     head: mk(new THREE.Mesh(new THREE.SphereGeometry(P.HEADR, 12, 9), mat)),
-    torso: cyl(0.105), shBar: cyl(0.055), hipBar: cyl(0.05),
+    t1: cyl(0.108), t2: cyl(0.100), shBar: cyl(0.055), hipBar: cyl(0.05),
     aU: [cyl(0.046), cyl(0.046)], aF: [cyl(0.04), cyl(0.04)],
     hand: [mk(new THREE.Mesh(new THREE.SphereGeometry(0.068, 8, 6), mat)),
            mk(new THREE.Mesh(new THREE.SphereGeometry(0.068, 8, 6), mat))],
@@ -751,15 +751,22 @@ function makeFigure(bodyCol, accentCol, isDef) {
     const hesiSide = hesiPose ? (moveDir || p.hand || 1) : 0;
     const rootY = P.HIP * (1 - crouch * 0.34) + lift;
     const latVel = vx * rx + vz * rz;
+    const tw = clamp(latVel * 0.07, -0.35, 0.35);
+    const cT = Math.cos(tw), sT = Math.sin(tw);
+    const rtx = rx * cT + rz * sT, rtz = -rx * sT + rz * cT;
     const bodyFold = crouch * (defPose ? 0.18 : 0.14) + (primPose ? prim.fold : (crossPose && moveT < 0.48 ? 0.08 : 0));
     const primLean = primPose ? prim.shoulder * 0.13 : 0;
     const sideLean = rx * (hesiSide * 0.08 + primLean + (defPose ? clamp(latVel * 0.075, -0.16, 0.16) : 0));
     const sideLeanZ = rz * (hesiSide * 0.08 + primLean + (defPose ? clamp(latVel * 0.075, -0.16, 0.16) : 0));
     const leanX = clamp(vx * 0.045, -0.28, 0.28) + fx * bodyFold + sideLean + (p.leanX || 0);
     const leanZ = clamp(vz * 0.045, -0.28, 0.28) + fz * bodyFold + sideLeanZ + (p.leanZ || 0);
+    const hipX = x - leanX * 0.28, hipZ = z - leanZ * 0.28;
     const shX = x + leanX, shZ = z + leanZ;
     const waistDrop = crouch * (defPose ? 0.15 : 0.10) + (primPose ? prim.waist : (crossPose && moveT < 0.48 ? 0.07 : 0)) + (defPose ? 0.07 : 0);
     const shY = rootY + (P.SH - P.HIP) * (1 - crouch * (defPose ? 0.26 : 0.20)) - waistDrop + (hesiPose ? 0.055 : 0);
+    const midX = lerp(hipX, shX, 0.5) + leanX * 0.35;
+    const midZ = lerp(hipZ, shZ, 0.5) + leanZ * 0.35;
+    const midY = lerp(rootY, shY, 0.52);
     const hdX = shX + leanX * 0.4, hdZ = shZ + leanZ * 0.4;
     const hdY = shY + (P.HEADY - P.SH);
 
@@ -813,7 +820,7 @@ function makeFigure(bodyCol, accentCol, isDef) {
     /* legs */
     for (let s = 0; s < 2; s++) {
       const side = s === 0 ? -1 : 1;
-      const hjx = x + rx * side * P.HIPW / 2, hjz = z + rz * side * P.HIPW / 2;
+      const hjx = hipX + rx * side * P.HIPW / 2, hjz = hipZ + rz * side * P.HIPW / 2;
       ik(hjx, rootY, hjz, feet[s].x, feet[s].y + 0.05, feet[s].z,
         P.L1, P.L2, fx + rx * side * 0.3, 0.05, fz + rz * side * 0.3, IKO);
       seg(F.lU[s], hjx, rootY, hjz, IKO.kx, IKO.ky, IKO.kz);
@@ -822,10 +829,11 @@ function makeFigure(bodyCol, accentCol, isDef) {
       F.foot[s].rotation.set(0, yaw, 0);
     }
 
-    /* torso / head */
-    seg(F.torso, x, rootY, z, shX, shY, shZ);
-    seg(F.shBar, shX - rx * P.SHW / 2, shY, shZ - rz * P.SHW / 2, shX + rx * P.SHW / 2, shY, shZ + rz * P.SHW / 2);
-    seg(F.hipBar, x - rx * P.HIPW / 2, rootY, z - rz * P.HIPW / 2, x + rx * P.HIPW / 2, rootY, z + rz * P.HIPW / 2);
+    /* curved spine / head */
+    seg(F.t1, hipX, rootY, hipZ, midX, midY, midZ);
+    seg(F.t2, midX, midY, midZ, shX, shY, shZ);
+    seg(F.shBar, shX - rtx * P.SHW / 2, shY, shZ - rtz * P.SHW / 2, shX + rtx * P.SHW / 2, shY, shZ + rtz * P.SHW / 2);
+    seg(F.hipBar, hipX - rx * P.HIPW / 2, rootY, hipZ - rz * P.HIPW / 2, hipX + rx * P.HIPW / 2, rootY, hipZ + rz * P.HIPW / 2);
     F.head.position.set(hdX, hdY, hdZ);
     if (band) { band.position.set(hdX, hdY + 0.02, hdZ); band.rotation.set(Math.PI / 2 - 0.25, yaw, 0); }
 
@@ -837,48 +845,21 @@ function makeFigure(bodyCol, accentCol, isDef) {
     function setT(i, tx, ty, tz) { tgt[i][0] = tx; tgt[i][1] = ty; tgt[i][2] = tz; }
     const bx = p.bx, by = p.by, bz = p.bz;
     if (style === STYLE.DRIB) {
-      if (crossPose) {
-        const fromIdx = (p.moveFromHand || hand) > 0 ? 1 : 0;
-        const toIdx = (p.moveToHand || -hand) > 0 ? 1 : 0;
-        const oldS = fromIdx === 0 ? -1 : 1;
-        const newS = toIdx === 0 ? -1 : 1;
-        const spread = primPose ? prim.handSpread : 0.64;
-        const close = smooth(0.10, 0.34, moveT) * (1 - smooth(0.42, 0.62, moveT));
-        const expand = smooth(0.48, 0.86, moveT);
-        if (moveT < 0.28) {
-          setT(fromIdx, bx - fx * 0.10 + rx * oldS * 0.12, by + 0.035, bz - fz * 0.10 + rz * oldS * 0.12);
-          setT(toIdx, shX + rx * newS * lerp(0.16, 0.08, close) - fx * 0.02, rootY + 0.42, shZ + rz * newS * lerp(0.16, 0.08, close) - fz * 0.02);
-        } else if (moveT > 0.55) {
-          const flare = lerp(0.26, spread + 0.08, expand);
-          setT(fromIdx, shX + rx * oldS * flare - fx * 0.10, rootY + 0.52 + expand * 0.07, shZ + rz * oldS * flare - fz * 0.10);
-          setT(toIdx, bx - fx * 0.10 + rx * newS * 0.14, by + 0.035, bz - fz * 0.10 + rz * newS * 0.14);
-        } else {
-          const pinch = lerp(0.16, 0.28, 1 - close);
-          setT(fromIdx, x + rx * oldS * pinch - fx * 0.03, rootY + 0.45, z + rz * oldS * pinch - fz * 0.03);
-          setT(toIdx, x + rx * newS * pinch - fx * 0.01, rootY + 0.41, z + rz * newS * pinch - fz * 0.01);
-        }
-      } else {
-        const raise = hesiPose ? 0.20 : 0;
-        const handS = ballIdx === 0 ? -1 : 1;
-        const handY = clamp(by + 0.035, rootY + 0.24 + raise * 0.25, rootY + 0.78 + raise);
-        setT(ballIdx, bx - fx * 0.12 + rx * handS * 0.18, handY, bz - fz * 0.12 + rz * handS * 0.18);
-        const o = 1 - ballIdx, os = o === 0 ? -1 : 1;
-        if (hesiPose) {
-          setT(o, shX - fx * 0.02 + rx * os * 0.56, shY + 0.32, shZ - fz * 0.02 + rz * os * 0.56);
-        } else {
-          setT(o, x - fx * 0.02 + rx * os * 0.44, rootY + 0.30, z - fz * 0.02 + rz * os * 0.44);
-        }
-      }
+      setT(ballIdx, bx, by, bz);
+      const o = 1 - ballIdx, os = o === 0 ? -1 : 1;
+      const hesiLift = hesiPose ? 0.16 : 0;
+      const offWide = hesiPose ? 0.50 : 0.32;
+      setT(o, shX + fx * 0.20 + rtx * os * offWide, rootY + 0.30 + hesiLift, shZ + fz * 0.20 + rtz * os * offWide);
     } else if (style === STYLE.HELD || style === STYLE.GATH || style === STYLE.RISE) {
-      setT(0, bx - rx * 0.09, by, bz - rz * 0.09);
-      setT(1, bx + rx * 0.09, by, bz + rz * 0.09);
+      setT(0, bx - rtx * 0.09, by, bz - rtz * 0.09);
+      setT(1, bx + rtx * 0.09, by, bz + rtz * 0.09);
     } else if (style === STYLE.FOLLOW) {
       setT(ballIdx, shX + fx * 0.32, shY + 0.52, shZ + fz * 0.32);
       const o = 1 - ballIdx, os = o === 0 ? -1 : 1;
       setT(o, shX + rx * os * 0.3 + fx * 0.1, shY - 0.05, shZ + rz * os * 0.3 + fz * 0.1);
     } else if (style === STYLE.DEF) {
-      setT(0, shX - rx * 0.62 + fx * 0.12, rootY + 0.06, shZ - rz * 0.62 + fz * 0.12);
-      setT(1, shX + rx * 0.62 + fx * 0.12, rootY + 0.06, shZ + rz * 0.62 + fz * 0.12);
+      setT(0, shX - rtx * 0.52 + fx * 0.16, rootY + 0.14, shZ - rtz * 0.52 + fz * 0.16);
+      setT(1, shX + rtx * 0.52 + fx * 0.16, rootY + 0.14, shZ + rtz * 0.52 + fz * 0.16);
     } else if (style === STYLE.CONTEST) {
       setT(1, shX + fx * 0.20 + rx * 0.10, shY + 0.86, shZ + fz * 0.20 + rz * 0.10);
       setT(0, shX - rx * 0.30 + fx * 0.08, shY + 0.05, shZ - rz * 0.30 + fz * 0.08);
@@ -894,36 +875,13 @@ function makeFigure(bodyCol, accentCol, isDef) {
     }
     for (let s = 0; s < 2; s++) {
       const side = s === 0 ? -1 : 1;
-      const sjx = shX + rx * side * P.SHW / 2, sjz = shZ + rz * side * P.SHW / 2;
-      if (style === STYLE.DRIB) {
-        let dx = tgt[s][0] - sjx, dy = tgt[s][1] - shY, dz = tgt[s][2] - sjz;
-        let dl = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        const crossExtend = crossPose ? smooth(0.48, 0.86, moveT) : 1;
-        const crossMin = crossPose ? lerp(0.44, s === ballIdx ? 0.665 : 0.625, crossExtend) : 0;
-        const minReach = crossPose ? crossMin : (s === ballIdx ? 0.625 : 0.585);
-        const maxReach = P.A1 + P.A2 - 0.012;
-        if (dl < minReach) {
-          const bxv = rx * side * 0.86 - fx * 0.22;
-          const byv = crossPose ? -0.03 : -0.12;
-          const bzv = rz * side * 0.86 - fz * 0.22;
-          dx = dx * 0.45 + bxv * 0.55;
-          dy = dy * 0.45 + byv * 0.55;
-          dz = dz * 0.45 + bzv * 0.55;
-          dl = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-          const reach = Math.min(maxReach, minReach);
-          tgt[s][0] = sjx + dx / dl * reach;
-          tgt[s][1] = shY + dy / dl * reach;
-          tgt[s][2] = sjz + dz / dl * reach;
-        }
-      }
-      const rate = (style === STYLE.DRIB && crossPose) ? 42 : (style === STYLE.DRIB && s === ballIdx) ? 34 : 17;
+      const sjx = shX + rtx * side * P.SHW / 2, sjz = shZ + rtz * side * P.SHW / 2;
+      const rate = (style === STYLE.DRIB && s === ballIdx) ? 34 : 17;
       hands[s].x = dampN(hands[s].x, tgt[s][0], rate, dt);
       hands[s].y = dampN(hands[s].y, tgt[s][1], rate, dt);
       hands[s].z = dampN(hands[s].z, tgt[s][2], rate, dt);
       let hxv, hyv, hzv;
       if (style === STYLE.RISE || style === STYLE.FOLLOW) { hxv = -fx * 0.8; hyv = -0.25; hzv = -fz * 0.8; }
-      else if (style === STYLE.DRIB && crossPose) { hxv = rx * side * 1.55 - fx * 0.18; hyv = -0.08; hzv = rz * side * 1.55 - fz * 0.18; }
-      else if (style === STYLE.DRIB) { hxv = rx * side * 1.20 - fx * 0.18; hyv = -0.20; hzv = rz * side * 1.20 - fz * 0.18; }
       else { hxv = rx * side * 0.8 - fx * 0.25; hyv = -0.55; hzv = rz * side * 0.8 - fz * 0.25; }
       ik(sjx, shY, sjz, hands[s].x, hands[s].y, hands[s].z, P.A1, P.A2, hxv, hyv, hzv, IKO);
       seg(F.aU[s], sjx, shY, sjz, IKO.kx, IKO.ky, IKO.kz);
@@ -973,33 +931,19 @@ const ball = (function () {
     if (B.st === 'dribble') {
       const hang = O.hang > 0;
       const crossMove = O.move && isCrossMove(O.move.type);
-      if (!hang && !crossMove) O.dribPhase += dt / O.dribDur;
+      if (!hang) O.dribPhase += dt / O.dribDur;
       const ph = O.dribPhase % 1;
-      if (!crossMove && B.prevPhase < 0.5 && ph >= 0.5) { SND.bounce(clamp(0.4 + O.spd * 0.14, 0.4, 1)); O.dribbles++; }
+      if (B.prevPhase < 0.5 && ph >= 0.5) { SND.bounce(clamp(0.4 + O.spd * 0.14, 0.4, 1)); O.dribbles++; }
       B.prevPhase = ph;
       const fxv = Math.sin(O.yaw), fzv = Math.cos(O.yaw);
       const rxv = -fzv, rzv = fxv;
-      if (crossMove) {
-        const mt = clamp(O.move.t / O.move.dur, 0, 1);
-        const Pm = O.prim || crossPrimitive(O.move, mt);
-        if (!O.move.bounced && Pm.bounceReady) {
-          O.move.bounced = true;
-          SND.bounce(clamp(0.62 + O.spd * 0.12, 0.62, 1));
-          O.dribbles++;
-        }
-        B.latCur = Pm.lat;
-        B.x = dampN(B.x, O.x + rxv * Pm.lat * 0.58 + fxv * (Pm.fwd - 0.16), 34, dt);
-        B.z = dampN(B.z, O.z + rzv * Pm.lat * 0.58 + fzv * (Pm.fwd - 0.16), 34, dt);
-        B.y = dampN(B.y, Pm.ballY - O.crouch * 0.035, 36, dt);
-      } else {
-        B.latCur = dampN(B.latCur, O.latTgt, 16, dt);
-        const hx = O.x + rxv * B.latCur * 0.54 + fxv * (O.fwdOff - 0.16);
-        const hz = O.z + rzv * B.latCur * 0.54 + fzv * (O.fwdOff - 0.16);
-        const hH = (O.lowT > 0 ? 0.58 : (hang ? 1.16 : 1.02)) - O.crouch * 0.18;
-        const yv = BALL_R + (hH - BALL_R) * Math.pow(Math.abs(Math.cos(Math.PI * ph)), 1.22);
-        B.x = dampN(B.x, hx, 22, dt); B.z = dampN(B.z, hz, 22, dt);
-        B.y = dampN(B.y, hang ? hH : yv, hang ? 30 : 22, dt);
-      }
+      B.latCur = dampN(B.latCur, O.latTgt, crossMove ? 26 : 16, dt);
+      const hx = O.x + rxv * B.latCur * 0.42 + fxv * O.fwdOff;
+      const hz = O.z + rzv * B.latCur * 0.42 + fzv * O.fwdOff;
+      const hH = (O.lowT > 0 ? 0.58 : (hang ? 1.16 : 1.02)) - O.crouch * 0.18;
+      const yv = BALL_R + (hH - BALL_R) * Math.pow(Math.abs(Math.cos(Math.PI * ph)), 1.22);
+      B.x = dampN(B.x, hx, crossMove ? 28 : 22, dt); B.z = dampN(B.z, hz, crossMove ? 28 : 22, dt);
+      B.y = hang ? dampN(B.y, hH, 30, dt) : yv;
       B.spin += dt * (2 + O.spd);
     } else if (B.st === 'held') {
       const fxv = Math.sin(O.yaw), fzv = Math.cos(O.yaw);
@@ -1253,7 +1197,7 @@ function crossPrimitive(M, t) {
   return {
     lat, fwd, ballY,
     crouch: behind ? lerp(C.body.behindLoad, C.body.behindExit, exit) : lerp(C.body.crouchLoad, C.body.crouchExit, exit),
-    hang: t < 0.24 ? 0.08 : t > 0.46 ? 0.18 : 0,
+    hang: t > 0.58 ? 0.16 : 0,
     plant: t > T.plantStart && t < T.plantEnd,
     shoulder: M.dir * (-C.body.shoulderSell * loadSell + C.body.shoulderCatch * exitSell),
     fold: (1 - exit) * (behind ? C.body.behindFold : C.body.fold),
@@ -1654,42 +1598,27 @@ function resolvePlayerContact(dt) {
   const dd = hyp(dx, dz);
   if (dd <= 0.001) { O.clampT = 0; return; }
   const earned = D.beatenT > 0 || D.freezeT > 0 || D.airKind === 'fake';
-  const minD = earned ? 0.54 : 0.78;
+  const minD = earned ? 0.54 : 0.62;
   const ov = minD - dd;
   if (ov <= 0) { O.clampT = Math.max(0, O.clampT - dt * 3); return; }
 
   const nx = dx / dd, nzv = dz / dd;
-  const lane = laneInfo();
-  const laneCut = lane.between > 0.25 && lane.laneGap < 0.95 && !earned;
   const hold = O.pickedUp && O.st === 'stopped';
-  O.clampT = laneCut ? O.clampT + dt : Math.max(0, O.clampT - dt * 4);
-  const oShare = hold ? 0.12 : laneCut ? 0.92 : earned ? 0.62 : 0.82;
+  O.clampT = Math.max(0, O.clampT - dt * 4);
+  const oShare = hold ? 0.12 : earned ? 0.62 : 0.70;
   O.x += nx * ov * oShare; O.z += nzv * ov * oShare;
   D.x -= nx * ov * (1 - oShare); D.z -= nzv * ov * (1 - oShare);
 
-  const rimward = O.vx * lane.fx + O.vz * lane.fz;
-  if (!hold && rimward > 0 && laneCut) {
-    O.vx -= lane.fx * rimward * 0.86;
-    O.vz -= lane.fz * rimward * 0.86;
-  }
   if (hold) {
     O.vx = 0; O.vz = 0;
   } else {
-    O.vx = (O.vx + nx * ov * 3.2) * (laneCut ? 0.35 : 0.58);
-    O.vz = (O.vz + nzv * ov * 3.2) * (laneCut ? 0.35 : 0.58);
+    const closing = -(O.vx * nx + O.vz * nzv);
+    if (closing > 0) {
+      O.vx += nx * closing * 0.58;
+      O.vz += nzv * closing * 0.58;
+    }
   }
   D.vx -= nx * ov * 1.1; D.vz -= nzv * ov * 1.1;
-
-  if (laneCut && O.clampT > 0.18 && !O.move && !O.pickedUp && O.st === 'dribble' && O.contactCd <= 0) {
-    O.st = 'stopped'; O.pickedUp = true; ball.st = 'held';
-    O.pivot = O.hand > 0 ? 0 : 1;
-    O.windowT = 0.65; O.windowType = 'bump';
-    O.clampT = 0;
-    O.contactCd = 0.7;
-    D.staggerT = 0.18;
-    SND.thud();
-    showCue('clamped — create separation before the shot');
-  }
 
   O.x = clamp(O.x, -BOUNDS.x, BOUNDS.x);
   O.z = clamp(O.z, BOUNDS.zmin, BOUNDS.zmax);
