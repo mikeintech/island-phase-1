@@ -286,6 +286,7 @@
       <b>flick across body</b> — between-leg counter<br/>
       <b>flick back</b> — snatchback&nbsp;&nbsp;<b>back-diagonal</b> — stepback or spin<br/>
       <b>drive into his chest</b> — bump stop, then pivot<br/>
+      <b>release on a drive</b> — gather step layup · close burst dunk<br/>
       <b>release</b> — shoot&nbsp;&nbsp;<b>tap right back</b> — pump fake<br/>
       miss or get stripped in FIRST TO 7 and the stop counts for DEF.
     </div>
@@ -405,9 +406,9 @@ const MECH_DEFAULT = {
     impulse: { crossLoad: 0.55, curlLat: 0.55, curlFwd: 0.75, behindLat: 1.00, behindFwd: 0.35, crossSnap: 2.25, curlSnapLat: 2.65, curlSnapFwd: 1.45, behindSnapLat: 1.95 }
   },
   shot: {
-    trigger: { pullupFwdV: 1.40, pullupMinDist: 2.40, fadeBackV: -1.00, driveDist: 2.40 },
-    gather: { baseDur: 0.20, speedAdd: 0.05, crouch: 0.55, ballFwd: 0.24, ballY: 0.42, fakeDur: 0.30, fakeLift: 0.42 },
-    rise: { dur: 0.30, setJump: 0.52, pullupJump: 0.47, fadeJump: 0.42, driveJump: 0.44, pullupStop: 0.35, fadeBack: 1.10, driveStop: 0.50 },
+    trigger: { pullupFwdV: 1.40, pullupMinDist: 2.40, fadeBackV: -1.00, driveDist: 2.40, layupDist: 2.75, dunkDist: 1.45, finishFwdV: 0.85, dunkFwdV: 2.15 },
+    gather: { baseDur: 0.20, speedAdd: 0.05, crouch: 0.55, ballFwd: 0.24, ballY: 0.42, fakeDur: 0.30, fakeLift: 0.42, finishSide: 0.22, layupBallY: 0.70, dunkBallY: 0.84 },
+    rise: { dur: 0.30, setJump: 0.52, pullupJump: 0.47, fadeJump: 0.42, driveJump: 0.44, layupJump: 0.58, dunkJump: 0.76, layupDur: 0.34, dunkDur: 0.27, layupStep: 0.92, dunkStep: 1.25, pullupStop: 0.35, fadeBack: 1.10, driveStop: 0.50 },
     release: { fwdStart: 0.24, fwdEnd: 0.16, yStart: 0.42, yEnd: 0.92, followCrouch: 0.12 }
   }
 };
@@ -1004,7 +1005,16 @@ const ball = (function () {
   };
   function arrive() {
     const m = B.meta;
-    if (m.kind === 'in') {
+    if (m.kind === 'dunk') {
+      SND.rim(0.75);
+      SND.thud();
+      net.snap(0.95);
+      B.st = 'in';
+      B.netHit = true;
+      B.x = RIM.x; B.y = RIM.y + 0.02; B.z = RIM.z;
+      B.vx = 0; B.vz = 0; B.vy = -2.2;
+      G.onNet();
+    } else if (m.kind === 'in') {
       B.st = 'in';
       if (!m.pure) { SND.tick(); SND.rim(0.22); }
     } else if (m.kind === 'bank') {
@@ -1141,7 +1151,8 @@ const O = {
   dribbles: 0, pickedUp: false, pivot: -1, burstT: 0, hesiArmed: true,
   gT: 0, gDur: 0.2, riseT: 0, riseDur: 0.3, fallT: 0, jumpH: 0.5,
   shotType: 'set', speedAtGather: 0, midMoveAtG: false, crowdedAtG: false, rhythmAtG: 0,
-  relX: 0, relY: 0, relZ: 0, followT: 0, contactCd: 0, clampT: 0, pivotShown: false
+  finishKind: '', finishSide: 1, finishX: 0, finishZ: 0, finishStartX: 0, finishStartZ: 0,
+  gRootX: 0, gRootZ: 0, relX: 0, relY: 0, relZ: 0, followT: 0, contactCd: 0, clampT: 0, pivotShown: false
 };
 function oReset(x, z) {
   O.x = x; O.z = z; O.vx = 0; O.vz = 0; O.yaw = Math.PI;
@@ -1149,6 +1160,8 @@ function oReset(x, z) {
   O.dribPhase = 0.2; O.move = null; O.prim = null; O.windowT = 0; O.chain = 0;
   O.dribbles = 0; O.pickedUp = false; O.pivot = -1; O.burstT = 0;
   O.fwdOff = 0.08;
+  O.finishKind = ''; O.finishSide = 1; O.finishX = x; O.finishZ = z; O.finishStartX = x; O.finishStartZ = z;
+  O.gRootX = x; O.gRootZ = z;
   O.lift = 0; O.followT = 0; O.crouch = 0.34; O.contactCd = 0; O.clampT = 0; O.spdMem = 0;
 }
 function chainUp(n) { O.chain = Math.min(3, O.chain + (n || 1)); O.chainT = 1.2; }
@@ -1315,6 +1328,25 @@ function interpretFlick(f) {
   }
   startMove('cross', sgn(lt || 1));
 }
+function prepareFinishIntent() {
+  const S = MECH.shot;
+  const dx = RIM.x - O.x, dz = RIM.z - O.z;
+  const dist = hyp(dx, dz);
+  const tl = dist || 1;
+  const fx = dx / tl, fz = dz / tl;
+  const fwdV = O.vx * fx + O.vz * fz;
+  O.finishKind = '';
+  if (O.pickedUp || dist > S.trigger.layupDist || fwdV < S.trigger.finishFwdV) return;
+  const crowded = hyp(D.x - O.x, D.z - O.z) < 0.75 && !(D.beatenT > 0 || D.airKind === 'fake');
+  const dunkOk = dist <= S.trigger.dunkDist && fwdV > S.trigger.dunkFwdV && O.speedAtGather > 2.1 && !crowded;
+  O.finishKind = dunkOk ? 'dunk' : 'layup';
+  O.finishSide = O.hand || sgn(O.x || 1);
+  const carry = O.finishKind === 'dunk' ? S.rise.dunkStep : S.rise.layupStep;
+  const targetDist = O.finishKind === 'dunk' ? 0.34 : 0.66;
+  const step = Math.min(carry, Math.max(0, dist - targetDist));
+  O.finishX = O.x + fx * step;
+  O.finishZ = O.z + fz * step;
+}
 function tryShoot() {
   if (!(O.st === 'idle' || O.st === 'dribble' || O.st === 'stopped' || O.st === 'fake')) return;
   if (G.phase !== 'live') return;
@@ -1327,6 +1359,9 @@ function tryShoot() {
   O.crowdedAtG = hyp(D.x - O.x, D.z - O.z) < 0.95;
   const ph = O.dribPhase % 1;
   O.rhythmAtG = Math.abs(Math.cos(Math.PI * ph)) > 0.62 ? 1 : 0;
+  O.gRootX = O.x; O.gRootZ = O.z;
+  prepareFinishIntent();
+  if (O.finishKind) O.gDur += O.finishKind === 'dunk' ? 0.06 : 0.09;
   O.gFromX = ball.x; O.gFromY = ball.y; O.gFromZ = ball.z;
   ball.st = 'carry';
   D.event('gather', 0);
@@ -1342,17 +1377,21 @@ function beginRise() {
   const toX = (RIM.x - O.x), toZ = (RIM.z - O.z);
   const tl = toDist || 1;
   const fwdV = (O.vx * toX + O.vz * toZ) / tl;
-  if (O.windowT > 0 && O.windowType === 'step') O.shotType = 'fade';
+  if (O.finishKind) O.shotType = O.finishKind;
+  else if (O.windowT > 0 && O.windowType === 'step') O.shotType = 'fade';
   else if (fwdV < S.trigger.fadeBackV) O.shotType = 'fade';
   else if (fwdV > S.trigger.pullupFwdV && toDist > S.trigger.pullupMinDist) O.shotType = 'pullup';
   else if (toDist <= S.trigger.driveDist) O.shotType = 'drive';
   else O.shotType = 'set';
-  O.jumpH = { set: S.rise.setJump, pullup: S.rise.pullupJump, fade: S.rise.fadeJump, drive: S.rise.driveJump }[O.shotType];
-  O.riseT = 0; O.riseDur = S.rise.dur;
+  O.jumpH = { set: S.rise.setJump, pullup: S.rise.pullupJump, fade: S.rise.fadeJump, drive: S.rise.driveJump, layup: S.rise.layupJump, dunk: S.rise.dunkJump }[O.shotType];
+  O.riseT = 0;
+  O.riseDur = O.shotType === 'dunk' ? S.rise.dunkDur : O.shotType === 'layup' ? S.rise.layupDur : S.rise.dur;
+  O.finishStartX = O.x; O.finishStartZ = O.z;
   O.st = 'rise';
   if (O.shotType === 'pullup') { O.vx *= S.rise.pullupStop; O.vz *= S.rise.pullupStop; }
   else if (O.shotType === 'fade') { O.vx = -toX / tl * S.rise.fadeBack; O.vz = -toZ / tl * S.rise.fadeBack; }
   else if (O.shotType === 'drive') { O.vx *= S.rise.driveStop; O.vz *= S.rise.driveStop; }
+  else if (O.shotType === 'layup' || O.shotType === 'dunk') { O.vx = 0; O.vz = 0; }
   else { O.vx = 0; O.vz = 0; }
 }
 
@@ -1384,8 +1423,22 @@ function offenseUpdate(dt) {
     const t = clamp(O.gT / O.gDur, 0, 1);
     O.crouch = dampN(O.crouch, SG.crouch, 16, dt);
     const rootY = P.HIP * (1 - O.crouch * 0.34);
-    const cx = O.x + fx * SG.ballFwd, cy = rootY + SG.ballY, cz = O.z + fz * SG.ballFwd;
-    ball.setPos(lerp(O.gFromX, cx, t), lerp(O.gFromY, cy, t), lerp(O.gFromZ, cz, t));
+    if (O.finishKind) {
+      const stepT = smooth(0.06, 1, t) * (O.finishKind === 'dunk' ? 0.50 : 0.42);
+      O.x = lerp(O.gRootX, O.finishX, stepT);
+      O.z = lerp(O.gRootZ, O.finishZ, stepT);
+      O.prim = { plant: true };
+      const side = O.finishSide;
+      const ballY = O.finishKind === 'dunk' ? SG.dunkBallY : SG.layupBallY;
+      const liftT = smooth(0.34, 1, t);
+      const cx = O.x + fx * 0.18 + rx * side * SG.finishSide;
+      const cy = rootY + lerp(SG.ballY, ballY, liftT);
+      const cz = O.z + fz * 0.18 + rz * side * SG.finishSide;
+      ball.setPos(lerp(O.gFromX, cx, t), lerp(O.gFromY, cy, t), lerp(O.gFromZ, cz, t));
+    } else {
+      const cx = O.x + fx * SG.ballFwd, cy = rootY + SG.ballY, cz = O.z + fz * SG.ballFwd;
+      ball.setPos(lerp(O.gFromX, cx, t), lerp(O.gFromY, cy, t), lerp(O.gFromZ, cz, t));
+    }
     if (t >= 1) beginRise();
   } else if (O.st === 'rise') {
     const SR = MECH.shot.release;
@@ -1393,11 +1446,27 @@ function offenseUpdate(dt) {
     const t = clamp(O.riseT / O.riseDur, 0, 1);
     O.lift = O.jumpH * Math.sin(t * Math.PI / 2);
     O.crouch = dampN(O.crouch, SR.followCrouch, 14, dt);
-    O.x += O.vx * dt; O.z += O.vz * dt;
-    const rootY = P.HIP * (1 - O.crouch * 0.34) + O.lift;
-    const cy0 = rootY + SR.yStart, cy1 = rootY + SR.yEnd;
-    const fwd = lerp(SR.fwdStart, SR.fwdEnd, t);
-    ball.setPos(O.x + fx * fwd, lerp(cy0, cy1, t), O.z + fz * fwd);
+    if (O.shotType === 'layup' || O.shotType === 'dunk') {
+      const e = smooth(0, 1, t);
+      O.x = lerp(O.finishStartX, O.finishX, e);
+      O.z = lerp(O.finishStartZ, O.finishZ, e);
+      const rootY = P.HIP * (1 - O.crouch * 0.34) + O.lift;
+      const side = O.finishSide;
+      const reach = smooth(0.24, 1, t);
+      const sx = O.x + rx * side * (O.shotType === 'dunk' ? 0.12 : 0.26) + fx * 0.20;
+      const sy = rootY + (O.shotType === 'dunk' ? 0.88 : 0.74);
+      const sz = O.z + rz * side * (O.shotType === 'dunk' ? 0.12 : 0.26) + fz * 0.20;
+      const tx = RIM.x + rx * side * (O.shotType === 'dunk' ? 0.02 : 0.18);
+      const ty = RIM.y + (O.shotType === 'dunk' ? 0.48 : 0.34);
+      const tz = RIM.z + (O.shotType === 'dunk' ? 0.04 : -0.10);
+      ball.setPos(lerp(sx, tx, reach), lerp(sy, ty, reach), lerp(sz, tz, reach));
+    } else {
+      O.x += O.vx * dt; O.z += O.vz * dt;
+      const rootY = P.HIP * (1 - O.crouch * 0.34) + O.lift;
+      const cy0 = rootY + SR.yStart, cy1 = rootY + SR.yEnd;
+      const fwd = lerp(SR.fwdStart, SR.fwdEnd, t);
+      ball.setPos(O.x + fx * fwd, lerp(cy0, cy1, t), O.z + fz * fwd);
+    }
     if (t >= 1) releaseBall();
   } else if (O.st === 'fall') {
     O.fallT += dt;
@@ -1631,9 +1700,14 @@ function releaseBall() {
   const dx = RIM.x - O.x, dz = RIM.z - O.z;
   const dist = hyp(dx, dz);
   const relY = P.HIP * (1 - O.crouch * 0.34) + O.lift + 0.92;
-  O.relX = O.x + (dx / (dist || 1)) * 0.16;
-  O.relZ = O.z + (dz / (dist || 1)) * 0.16;
-  O.relY = relY;
+  const finishShot = O.shotType === 'layup' || O.shotType === 'dunk';
+  if (finishShot) {
+    O.relX = ball.x; O.relY = ball.y; O.relZ = ball.z;
+  } else {
+    O.relX = O.x + (dx / (dist || 1)) * 0.16;
+    O.relZ = O.z + (dz / (dist || 1)) * 0.16;
+    O.relY = relY;
+  }
 
   /* --- gather metrics --- */
   const sep = hyp(D.x - O.x, D.z - O.z);
@@ -1650,9 +1724,13 @@ function releaseBall() {
   if (O.windowT > 0 && O.windowType === 'spin') balance = Math.max(balance, 0.74);
   if (O.shotType === 'fade' && !(O.windowType === 'step' && O.windowT > 0)) balance *= 0.72;
   if (O.midMoveAtG) balance *= 0.7;
+  if (O.shotType === 'layup') balance = Math.max(balance, 0.76);
+  if (O.shotType === 'dunk') balance = Math.max(balance, 0.86);
 
   let gatherQ = 0.45 + O.rhythmAtG * 0.35 + (O.crowdedAtG ? 0 : 0.2);
   gatherQ = clamp(gatherQ, 0, 1);
+  if (O.shotType === 'layup') gatherQ = Math.max(gatherQ, 0.70);
+  if (O.shotType === 'dunk') gatherQ = Math.max(gatherQ, 0.82);
   const rhythm = clamp(0.25 + O.chain * 0.18, 0, 1);
 
   /* --- contest (measured now, at ball release) --- */
@@ -1669,20 +1747,32 @@ function releaseBall() {
 
   const fatigue = clamp((G.t - G.possStart - 8) / 12, 0, 0.28) + clamp((O.dribbles - 9) * 0.015, 0, 0.12);
   const clockRush = (G.mode === 'match') ? (G.clock < 1.2 ? 0.18 : G.clock < 2.5 ? 0.08 : 0) : 0;
-  const distF = dist <= 2.6 ? 1.04 : clamp(1 - (dist - 3) / 15, 0.55, 1);
+  const distF = O.shotType === 'dunk' ? 1.20 : O.shotType === 'layup' ? 1.12 : dist <= 2.6 ? 1.04 : clamp(1 - (dist - 3) / 15, 0.55, 1);
 
   let Q = distF * clamp(
     0.20 + 0.34 * sepS + 0.21 * balance + 0.16 * gatherQ + 0.10 * rhythm
     - 0.44 * contest - fatigue - clockRush, 0, 1);
+  if (O.shotType === 'layup') Q = clamp(Q + 0.12 - contest * 0.05, 0, 1);
+  if (O.shotType === 'dunk') Q = clamp(Q + 0.24 - contest * 0.10, 0, 1);
 
   const green = Q > 0.85 && contest < 0.15;
-  const make = Math.random() < clamp(Q * 1.25 - 0.02, 0.04, 0.97);
+  let makeProb = clamp(Q * 1.25 - 0.02, 0.04, 0.97);
+  if (O.shotType === 'layup') makeProb = clamp(0.58 + Q * 0.48 - contest * 0.22, 0.18, 0.98);
+  if (O.shotType === 'dunk') makeProb = clamp(0.78 + Q * 0.30 - contest * 0.30, 0.25, 0.99);
+  const make = Math.random() < makeProb;
   const beatenRecent = (G.t - D.beatenStamp) < 2.2;
   const bankAngle = Math.abs(O.x) > 0.75 && Math.abs(O.x) < 4.2 && dist > 2.0 && dist < 6.4;
   const bankLook = bankAngle && contest < 0.45 && balance > 0.48 && Math.random() < (dist < 3.2 ? 0.22 : 0.10);
   let outcome, meta;
   if (make) {
-    if (contest < 0.26 && Q > 0.56 && (!bankLook || Q > 0.78)) {
+    if (O.shotType === 'dunk') {
+      outcome = 'dunk';
+      meta = { kind: 'dunk', pure: false };
+    } else if (O.shotType === 'layup') {
+      const useGlass = Math.abs(O.x) > 0.35 && Math.random() < 0.62;
+      outcome = 'layup';
+      meta = useGlass ? { kind: 'bank', pure: false, bankX: clamp(O.x * 0.28, -0.55, 0.55) } : { kind: 'in', pure: false };
+    } else if (contest < 0.26 && Q > 0.56 && (!bankLook || Q > 0.78)) {
       const cooked = beatenRecent && sepS > 0.66;
       outcome = cooked ? 'cooked' : 'pure';
       meta = { kind: 'in', pure: true };
@@ -1700,6 +1790,9 @@ function releaseBall() {
   let ox = 0, oz = 0;
   const sx = (O.x - RIM.x) / (dist || 1), sz = (O.z - RIM.z) / (dist || 1);
   if (outcome === 'pure' || outcome === 'cooked') { const a = rand(Math.PI * 2), r = rand(0.03); ox = Math.sin(a) * r; oz = Math.cos(a) * r; }
+  else if (outcome === 'dunk') { ox = 0; oz = 0.02; }
+  else if (outcome === 'layup' && meta.kind === 'bank') { ox = meta.bankX; oz = -0.42; }
+  else if (outcome === 'layup') { ox = O.finishSide * 0.07; oz = 0.04; }
   else if (outcome === 'bank') { ox = meta.bankX; oz = -0.42; }
   else if (outcome === 'clean') { const a = rand(Math.PI * 2); ox = Math.sin(a) * 0.07; oz = Math.cos(a) * 0.07; }
   else if (outcome === 'rimmake') { const a = rand(Math.PI * 2); ox = Math.sin(a) * 0.16; oz = Math.cos(a) * 0.16; }
@@ -1713,14 +1806,16 @@ function releaseBall() {
     else if (cause === 'rushed') { ox = -sx * r; oz = -sz * r; meta.board = Math.abs(O.x) < 1.6 && Math.random() < 0.5; }
     else { const pS = sgn(rand(-1, 1)); ox = -sz * pS * r; oz = sx * pS * r; }
   }
-  const T = clamp(0.62 + dist * 0.075, 0.8, 1.5);
-  const ty = outcome === 'bank' ? RIM.y + 0.46 : RIM.y + 0.02;
+  let T = clamp(0.62 + dist * 0.075, 0.8, 1.5);
+  let ty = (outcome === 'bank' || (outcome === 'layup' && meta.kind === 'bank')) ? RIM.y + 0.46 : RIM.y + 0.02;
+  if (outcome === 'layup') { T = 0.38; ty = meta.kind === 'bank' ? RIM.y + 0.46 : RIM.y + 0.06; }
+  if (outcome === 'dunk') { T = 0.18; ty = RIM.y + 0.10; }
   ball.launch(O.relX, O.relY, O.relZ, RIM.x + ox, ty, RIM.z + oz, T, meta);
   SND.whoosh();
 
   G.pending = {
     outcome, green, Q,
-    pts: dist > ARC_R - 0.03 ? 2 : 1,
+    pts: finishShot ? 1 : dist > ARC_R - 0.03 ? 2 : 1,
     grades: {
       sep: sepEff < 0.55 ? 'NONE' : sepEff < 1.05 ? 'TIGHT' : sepEff < 1.75 ? 'GOOD' : 'EXCELLENT',
       bal: balance < 0.45 ? 'RUSHED' : balance < 0.75 ? 'OK' : 'CLEAN',
@@ -2053,7 +2148,11 @@ G.onNet = function () {
   const p = G.pending;
   G.rec.netT = G.t;
   const pure = p.outcome === 'pure' || p.outcome === 'cooked';
-  if (p.outcome === 'cooked') {
+  if (p.outcome === 'dunk') {
+    SND.crowd();
+    Cam.shake = 0.45; Cam.beatT = 0.65;
+    if (navigator.vibrate) navigator.vibrate(35);
+  } else if (p.outcome === 'cooked') {
     SND.swish(1.25, true); SND.crowd();
     Cam.shake = 0.5; Cam.beatT = 0.9;
     if (navigator.vibrate) navigator.vibrate([12, 40, 70]);
@@ -2078,10 +2177,10 @@ G.onBallDead = function () {
   else if (!G.resolved && !G.pending && G.phase === 'live') { G.resolve(false, 0); }
 };
 G.score = function (p) {
-  const label = { pure: 'PURE SWISH', cooked: 'COOKED SWISH', clean: 'CLEAN', bank: 'BANK', rimmake: 'BUCKET' }[p.outcome];
-  const cls = (p.outcome === 'pure' || p.outcome === 'cooked') ? 'gold' : 'make';
+  const label = { pure: 'PURE SWISH', cooked: 'COOKED SWISH', clean: 'CLEAN', bank: 'BANK', layup: 'LAYUP', dunk: 'DUNK', rimmake: 'BUCKET' }[p.outcome];
+  const cls = (p.outcome === 'pure' || p.outcome === 'cooked' || p.outcome === 'dunk') ? 'gold' : 'make';
   let sub = '+' + p.pts + (p.green ? ' · PERFECT' : '');
-  showBanner(label, sub, cls + (p.outcome === 'cooked' ? ' shake' : ''), p.outcome === 'rimmake' ? 1.2 : 1.7);
+  showBanner(label, sub, cls + ((p.outcome === 'cooked' || p.outcome === 'dunk') ? ' shake' : ''), p.outcome === 'rimmake' ? 1.2 : 1.7);
   if (p.outcome === 'pure' || p.outcome === 'cooked' || p.green) showChips(p.grades, p.outcome === 'cooked' ? 'COOKED' : null);
   G.sy += (G.mode === 'match') ? p.pts : 0;
   G.resolve(true, p.outcome === 'cooked' ? 1 : 0);
@@ -2221,7 +2320,7 @@ function poseFigures(dt) {
     prim: O.prim,
     bx: ball.x, by: ball.y, bz: ball.z,
     pivot: (O.pickedUp && O.st === 'stopped') ? O.pivot : -1,
-    plant: (O.windowT > 0 && (O.windowType === 'step' || O.windowType === 'bump')) || (O.prim && O.prim.plant)
+    plant: (O.windowT > 0 && (O.windowType === 'step' || O.windowType === 'bump')) || !!O.finishKind || (O.prim && O.prim.plant)
   }, dt);
   figD.pose({
     x: D.x, z: D.z, yaw: D.yaw, crouch: D.crouch, lift: D.lift,
